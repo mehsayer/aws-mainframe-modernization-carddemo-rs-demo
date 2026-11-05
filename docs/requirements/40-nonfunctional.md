@@ -1,0 +1,16 @@
+# Non-Functional Requirements
+
+| ID | Requirement |
+|-----|------------------------------|
+| NFR-01 | **Behavioural fidelity.** For the same input data and key strokes, the Rust system shows the same screens (field contents, messages, colours and cursor position) and writes byte-identical output records and reports. The only exceptions are run-dependent values: current date/time, timestamps, and system/application ids. |
+| NFR-02 | **Data compatibility.** The Rust system imports and exports the original fixed-width record layouts in both ASCII and EBCDIC (code page 037). That includes zoned decimal with overpunched sign, COMP-3 and binary fields. A load followed by an unload is byte-identical to the input. |
+| NFR-03 | **Decimal arithmetic.** All monetary arithmetic uses fixed-point decimal with the COBOL picture's precision. Results are truncated (not rounded) unless the source says ROUNDED. Binary floating point is never used for money. |
+| NFR-04 | **Transactional integrity.** Each online interaction (one pseudo-conversational task) is a unit of work. Updates are committed at task end or SYNCPOINT, and rolled back on SYNCPOINT ROLLBACK or abend. A batch step that abends leaves the files in the state the original would. |
+| NFR-05 | **Terminal UI.** The online application runs in a terminal at least 80×24, rendering each BMS map at its original row/column positions and colours. PF1–PF12 are F1–F12. PF13–PF24 are Shift+F1–F12. ENTER, CLEAR (Esc), PA1 and PA2 are supported. Field-level protection and numeric-only attributes are enforced. |
+| NFR-06 | **Multi-user.** Several terminal sessions can run against the same data store at the same time. Record locking makes READ UPDATE / REWRITE safe. |
+| NFR-07 | **Batch operation.** Each JCL job is available as a named job run from the command line, with the same step order, condition-code handling and return codes (0, 4, abend 999 → non-zero exit). |
+| NFR-08 | **Demonstrability.** One command resets the data store to the shipped sample data. A scripted demo (sign-on, browse, update, posting run, report) completes in under 10 minutes. The application starts in under 1 second. |
+| NFR-09 | **Portability.** The system builds with stable Rust on Linux, macOS and Windows. It needs no mainframe, CICS, VSAM or COBOL runtime. SQLite is embedded. |
+| NFR-10 | **Traceability.** Each Rust program module names the COBOL program it replaces. Its functions are named after the original paragraphs. |
+| NFR-11 | **Security parity.** Passwords are stored and compared in plain text and upper case, as in the original (USRSEC). This is a known weakness kept for fidelity, and the deployment must treat the data store as sensitive. |
+| NFR-12 | **Observability.** Batch programs write their DISPLAY output to stdout and the job log, as SYSOUT did. Online abends are logged with the program name and abend code. |
