@@ -4,6 +4,8 @@ pub mod cbstm03a;
 pub mod cbtrn02c;
 pub mod cbtrn03c;
 pub mod ctx;
+pub mod export;
+pub mod readers;
 pub mod jobs;
 pub mod repro;
 pub mod seqfile;

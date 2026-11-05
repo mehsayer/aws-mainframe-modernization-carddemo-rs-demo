@@ -12,7 +12,7 @@ fn full_batch_cycle() {
     batch::repro::reset(&v, &seed).unwrap();
     let env = Env { vsam: &v, root: root.clone(), seed, echo: false };
     let o = JobOpts { report_end: "2022-07-31".into(), ..JobOpts::default() };
-    for job in ["TRANBKP", "POSTTRAN", "INTCALC", "TRANBKP", "COMBTRAN", "TRANREPT", "CREASTMT"] {
+    for job in ["TRANBKP", "POSTTRAN", "INTCALC", "TRANBKP", "COMBTRAN", "TRANREPT", "CREASTMT", "READACCT", "READCARD", "READXREF", "READCUST", "DALYVRFY", "CBEXPORT", "CBIMPORT"] {
         let logs = run_job(&env, job, &o).unwrap_or_else(|(l, a)| panic!("{job} {a}: {:?}", l.last().map(|x| &x.sysout)));
         for l in &logs {
             println!("{job:9} {:8} {:8} {:?} {}", l.step, l.program, l.rc, l.sysout.last().cloned().unwrap_or_default());
@@ -25,4 +25,10 @@ fn full_batch_cycle() {
     let stmt = std::fs::read_to_string(env.ds("STATEMNT.PS")).unwrap();
     println!("{}", stmt.lines().take(24).collect::<Vec<_>>().join("\n"));
     assert!(stmt.contains("END OF STATEMENT"));
+    // export -> import round trip reproduces the master files
+    for (imp, ds) in [("CUSTDATA.IMPORT", "CUSTDATA"), ("ACCTDATA.IMPORT", "ACCTDATA"), ("CARDXREF.IMPORT", "CARDXREF"), ("TRANSACT.IMPORT", "TRANSACT"), ("CARDDATA.IMPORT", "CARDDATA")] {
+        let a = std::fs::read(env.ds(imp)).unwrap();
+        let b: Vec<u8> = v.unload(ds).unwrap().concat();
+        assert!(a == b, "round trip mismatch for {ds}");
+    }
 }

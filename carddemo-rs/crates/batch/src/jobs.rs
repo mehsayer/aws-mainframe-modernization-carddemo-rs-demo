@@ -129,6 +129,14 @@ pub const JOBS: &[(&str, &str)] = &[
     ("COMBTRAN", "Combine system and posted transactions"),
     ("TRANREPT", "Transaction report (CBTRN03C)"),
     ("CREASTMT", "Customer statements, text and HTML (CBSTM03A/B)"),
+    ("READACCT", "Print accounts, write demo formats (CBACT01C)"),
+    ("READCARD", "Print card file (CBACT02C)"),
+    ("READXREF", "Print cross reference (CBACT03C)"),
+    ("READCUST", "Print customers (CBCUS01C)"),
+    ("DALYVRFY", "Verify daily transactions (CBTRN01C, no JCL in original)"),
+    ("CBEXPORT", "Export all master data (CBEXPORT)"),
+    ("CBIMPORT", "Import export file into sequential files (CBIMPORT)"),
+    ("WAITSTEP", "Wait 36 seconds (COBSWAIT)"),
     ("TRANIDX", "Define AIX on transaction master (automatic)"),
     ("OPENFIL", "Open VSAM files in CICS (no-op)"),
 ];
@@ -331,6 +339,54 @@ fn run_job_inner(env: &Env, job: &str, o: &JobOpts, logs: &mut Vec<StepLog>) -> 
                 ],
                 "",
             )?;
+        }
+        "READACCT" => {
+            env.step(logs, "STEP05", "CBACT01C", crate::readers::cbact01c, vec![
+                ("ACCTFILE", v("ACCTDATA")),
+                ("OUTFILE", Dd::File(env.ds("ACCTDATA.PSCOMP"), Format::Fixed)),
+                ("ARRYFILE", Dd::File(env.ds("ACCTDATA.ARRYPS"), Format::Fixed)),
+                ("VBRCFILE", Dd::File(env.ds("ACCTDATA.VBPS"), Format::Fixed)),
+            ], "")?;
+        }
+        "READCARD" => drop(env.step(logs, "STEP05", "CBACT02C", crate::readers::cbact02c, vec![("CARDFILE", v("CARDDATA"))], "")?),
+        "READXREF" => drop(env.step(logs, "STEP05", "CBACT03C", crate::readers::cbact03c, vec![("XREFFILE", v("CARDXREF"))], "")?),
+        "READCUST" => drop(env.step(logs, "STEP05", "CBCUS01C", crate::readers::cbcus01c, vec![("CUSTFILE", v("CUSTDATA"))], "")?),
+        "DALYVRFY" => {
+            let dalytran = o.dalytran.clone().unwrap_or_else(|| env.seed.join("AWS.M2.CARDDEMO.DALYTRAN.PS"));
+            let fmt = Format::guess(&dalytran);
+            env.step(logs, "STEP05", "CBTRN01C", crate::readers::cbtrn01c, vec![
+                ("DALYTRAN", Dd::File(dalytran, fmt)),
+                ("XREFFILE", v("CARDXREF")),
+                ("ACCTFILE", v("ACCTDATA")),
+            ], "")?;
+        }
+        "WAITSTEP" => {
+            let mut sysin = b"00003600".to_vec();
+            sysin.resize(80, b' ');
+            env.step(logs, "WAIT", "COBSWAIT", crate::readers::cobswait, vec![("SYSIN", Dd::Instream(vec![sysin]))], "")?;
+        }
+        "CBEXPORT" => {
+            env.step(logs, "STEP02", "CBEXPORT", crate::export::cbexport, vec![
+                ("CUSTFILE", v("CUSTDATA")),
+                ("ACCTFILE", v("ACCTDATA")),
+                ("XREFFILE", v("CARDXREF")),
+                ("TRANSACT", v("TRANSACT")),
+                ("CARDFILE", v("CARDDATA")),
+                ("EXPFILE", Dd::File(env.ds("EXPORT.DATA"), Format::Fixed)),
+            ], "")?;
+        }
+        "CBIMPORT" => {
+            let f = |n: &str| Dd::File(env.ds(n), Format::Fixed);
+            env.step(logs, "STEP01", "CBIMPORT", crate::export::cbimport, vec![
+                ("EXPFILE", f("EXPORT.DATA")),
+                ("CUSTOUT", f("CUSTDATA.IMPORT")),
+                ("ACCTOUT", f("ACCTDATA.IMPORT")),
+                ("XREFOUT", f("CARDXREF.IMPORT")),
+                ("TRNXOUT", f("TRANSACT.IMPORT")),
+                // KD-09: missing from CBIMPORT.jcl; supplied here so the step can run
+                ("CARDOUT", f("CARDDATA.IMPORT")),
+                ("ERROUT", f("IMPORT.ERRORS")),
+            ], "")?;
         }
         other => {
             eprintln!("JCL ERROR: unknown job {other}");
