@@ -1,5 +1,8 @@
 //! The CardDemo online (CICS) programs, translated paragraph by paragraph.
+pub mod accounts;
+pub mod cards;
 pub mod common;
+pub mod lookups;
 pub mod csutldtc;
 pub mod signon;
 pub mod transactions;
@@ -15,6 +18,11 @@ pub fn programs() -> HashMap<&'static str, Program> {
     p.insert("COMEN01C", signon::comen01c);
     p.insert("COADM01C", signon::coadm01c);
     p.insert("COUSR00C", users::cousr00c);
+    p.insert("COACTVWC", accounts::coactvwc);
+    p.insert("COACTUPC", accounts::coactupc);
+    p.insert("COCRDLIC", cards::cocrdlic);
+    p.insert("COCRDSLC", cards::cocrdslc);
+    p.insert("COCRDUPC", cards::cocrdupc);
     p.insert("COTRN00C", transactions::cotrn00c);
     p.insert("COTRN01C", transactions::cotrn01c);
     p.insert("COTRN02C", transactions::cotrn02c);
