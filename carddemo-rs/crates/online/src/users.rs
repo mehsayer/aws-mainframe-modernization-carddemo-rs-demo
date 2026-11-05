@@ -79,7 +79,6 @@ const TRAN0: &str = "CU00";
 pub fn cousr00c(t: &mut Task) -> Cr {
     let mut st = ListState { err: false, eof: false, message: String::new(), erase: true };
     let mut ca = entry(t, TRAN0, PGM0)?;
-    xset(&mut ca, X_NEXT, b"N");
     let mut map = t.map("COUSR0A");
     map.cursor("USRIDIN");
     if first_entry(&mut ca) {

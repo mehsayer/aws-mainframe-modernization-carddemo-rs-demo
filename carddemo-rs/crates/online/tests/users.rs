@@ -14,8 +14,14 @@ fn user_admin_journey() {
     assert_eq!(t.field("PAGENUM"), "00000001");
     t.key(Aid::Pf(7));
     assert_eq!(t.msg(), "You are already at the top of the page...");
+    // PF7 on page 1 sets NEXT-PAGE-YES (as in COUSR00C), so PF8 reads on and hits the end
+    t.key(Aid::Pf(8));
+    assert_eq!(t.msg(), "You have reached the bottom of the page...");
     t.key(Aid::Pf(8));
     assert_eq!(t.msg(), "You are already at the bottom of the page...");
+    // that PF8 cleared the rows before reaching end of file (original behaviour): re-list
+    assert_eq!(t.field("USRID01"), "");
+    t.enter();
     // select U on row 6 -> update screen with the user pre-filled
     t.typ("SEL0006", "U").enter();
     assert_eq!(t.map(), "COUSR2A");
