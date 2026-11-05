@@ -1,5 +1,6 @@
 //! CardDemo batch programs and job runner (JCL replacement).
 pub mod cbact04c;
+pub mod cbstm03a;
 pub mod cbtrn02c;
 pub mod cbtrn03c;
 pub mod ctx;

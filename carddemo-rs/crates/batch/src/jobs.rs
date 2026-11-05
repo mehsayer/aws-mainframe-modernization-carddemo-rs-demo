@@ -128,6 +128,7 @@ pub const JOBS: &[(&str, &str)] = &[
     ("INTCALC", "Interest calculation (CBACT04C)"),
     ("COMBTRAN", "Combine system and posted transactions"),
     ("TRANREPT", "Transaction report (CBTRN03C)"),
+    ("CREASTMT", "Customer statements, text and HTML (CBSTM03A/B)"),
     ("TRANIDX", "Define AIX on transaction master (automatic)"),
     ("OPENFIL", "Open VSAM files in CICS (no-op)"),
 ];
@@ -285,6 +286,48 @@ fn run_job_inner(env: &Env, job: &str, o: &JobOpts, logs: &mut Vec<StepLog>) -> 
                     ("TRANCATG", v("TRANCATG")),
                     ("DATEPARM", Dd::Instream(vec![dateparm])),
                     ("TRANREPT", Dd::File(rept, Format::Lines)),
+                ],
+                "",
+            )?;
+        }
+        "CREASTMT" => {
+            let seq = env.ds("TRXFL.SEQ");
+            env.util(logs, "STEP010", "SORT", || {
+                let recs = env.vsam.unload("TRANSACT").map_err(|e| e.to_string())?;
+                let mut recs = recs;
+                // SORT FIELDS=(263,16,CH,A,1,16,CH,A)
+                sort_records(&mut recs, &[(262, 16), (0, 16)]);
+                // OUTREC FIELDS=(1:263,16,17:1,262,279:279,50)
+                let out: Vec<Vec<u8>> = recs
+                    .iter()
+                    .map(|r| {
+                        let mut o = vec![b' '; 350];
+                        o[0..16].copy_from_slice(&r[262..278]);
+                        o[16..278].copy_from_slice(&r[0..262]);
+                        o[278..328].copy_from_slice(&r[278..328]);
+                        o
+                    })
+                    .collect();
+                write_file(&seq, &out, Format::Fixed)?;
+                Ok(format!("SORT/OUTREC TRANSACT -> TRXFL.SEQ: {} RECORDS", out.len()))
+            })?;
+            env.util(logs, "STEP020", "IDCAMS", || {
+                env.vsam.clear("TRXFL").map_err(|e| e.to_string())?;
+                let n = repro::repro_in(env.vsam, "TRXFL", &seq, Format::Fixed)?;
+                Ok(format!("REPRO TRXFL.SEQ -> TRXFL.VSAM.KSDS: {n} RECORDS"))
+            })?;
+            env.step(
+                logs,
+                "STEP040",
+                "CBSTM03A",
+                crate::cbstm03a::run,
+                vec![
+                    ("TRNXFILE", v("TRXFL")),
+                    ("XREFFILE", v("CARDXREF")),
+                    ("ACCTFILE", v("ACCTDATA")),
+                    ("CUSTFILE", v("CUSTDATA")),
+                    ("STMTFILE", Dd::File(env.ds("STATEMNT.PS"), Format::Lines)),
+                    ("HTMLFILE", Dd::File(env.ds("STATEMNT.HTML"), Format::Lines)),
                 ],
                 "",
             )?;
