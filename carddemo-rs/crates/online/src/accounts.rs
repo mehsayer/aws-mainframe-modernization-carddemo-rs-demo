@@ -222,11 +222,6 @@ impl Snap {
     fn money(&self, k: &str) -> Dec {
         cobol::numeric::decode(&self.get(k), MONEY)
     }
-    fn set_money(&mut self, k: &'static str, v: Dec) {
-        let mut b = [0u8; 12];
-        cobol::numeric::encode(v, MONEY, &mut b);
-        self.set(k, &b);
-    }
     fn to_bytes(&self, action: u8) -> Vec<u8> {
         let mut v = vec![action];
         for (k, l) in FIELDS {
