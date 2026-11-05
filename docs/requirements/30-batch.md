@@ -117,6 +117,13 @@ key and key length, and receives a 2-character return code and the record data.
 | | (c) VBRCFILE (variable-length records): a 12-byte record (id + status) and a 39-byte record (id + balance + limit + reissue year). |
 | FR-BAT-RDR-03 | COBDATFT (assembler): type 1 input `YYYYMMDD` → output `YYYY-MM-DD` (output type must be 1); type 2 input `YYYY-MM-DD` → output `YYYYMMDD` (output type must be 2). Anything else sets the error message `INVALID INPUT`. |
 
+## FR-BAT-VER — Daily transaction verification (CBTRN01C; no JCL ships with the original)
+
+| ID | Requirement |
+|---|---|
+| FR-BAT-VER-01 | Read DALYTRAN sequentially and DISPLAY each record. For each record: look up XREF by card number. If found, display `SUCCESSFUL READ OF XREF`, `CARD NUMBER: `, `ACCOUNT ID : `, `CUSTOMER ID: `, then read the account (`SUCCESSFUL READ OF ACCOUNT FILE`, or `INVALID ACCOUNT NUMBER FOUND` + `ACCOUNT <id> NOT FOUND`). If not found, display `INVALID CARD NUMBER FOR XREF` and `CARD NUMBER <n> COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-<id>`. No files are updated. |
+| FR-BAT-VER-02 | After end of file the lookup runs once more for the last record read (loop structure of the original). |
+
 ## FR-BAT-XPRT — Export / import (CBEXPORT, CBIMPORT)
 
 | ID | Requirement |
@@ -124,6 +131,7 @@ key and key length, and receives a 2-character return code and the record data.
 | FR-BAT-XPRT-01 | CBEXPORT reads customers, accounts, XREF, transactions and cards in that order. For each record it writes one 500-byte EXPORT-RECORD (CVEXPORT) with type `C`/`A`/`X`/`T`/`D`, timestamp `YYYY-MM-DD HH:MM:SS.00`, binary sequence number, branch `0001`, region `NORTH`, and the record body in the mixed COMP / COMP-3 / zoned layout of CVEXPORT. |
 | FR-BAT-XPRT-02 | It displays per-type counts and the total at the end. |
 | FR-BAT-XPRT-03 | CBIMPORT reads the export file and splits it by record type back into customer, account, XREF, transaction and card files. An unknown type is written to ERROUT as `timestamp|type|seq|Unknown record type encountered`. |
+| FR-BAT-XPRT-05 | *Deviation:* the EXPORT.DATA KSDS (`KEYS(4 28)` over a binary sequence number) is a fixed-length sequential file in write order. CBIMPORT reads it in the same order. |
 | FR-BAT-XPRT-04 | It displays the import statistics. Validation (`3000-VALIDATE-IMPORT`) only displays a completion message. |
 
 ## FR-BAT-UTIL — Utilities
@@ -142,4 +150,5 @@ key and key length, and receives a 2-character return code and the record data.
 | KD-02 | CBTRN03C | At EOF the last transaction amount is added to the totals a second time. |
 | KD-03 | CBTRN03C | The last account's "Account Total" line is never printed. |
 | KD-04 | CBSTM03A | Fixed in-memory limits of 51 cards × 10 transactions, with no bounds check. |
+| KD-09 | CBIMPORT JCL | The JCL has no CARDOUT DD although the program opens CARD-OUTPUT. The Rust job supplies it. |
 | KD-05 | CBACT01C | The OUTFILE cycle-debit value carries over from the previous record when the account's debit is non-zero. |

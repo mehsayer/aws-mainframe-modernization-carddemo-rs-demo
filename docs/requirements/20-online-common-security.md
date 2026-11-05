@@ -58,6 +58,8 @@
 | FR-USR-LST-04 | PF8 (page down): if there is a next page, continue after the last user id shown; otherwise `You are already at the bottom of the page...`. |
 | FR-USR-LST-05 | PF7 (page up): if the page number is greater than 1, page back from the first user id shown; otherwise `You are already at the top of the page...`. |
 | FR-USR-LST-06 | Hitting the end of the file while filling a page → `You have reached the bottom of the page...` (or `...top of the page...` going backward). The next-page flag is computed by reading one record ahead. |
+| KD-10 | ENDBR is issued without RESP. If STARTBR found nothing (search key beyond the last user), CICS raises INVREQ and the task **abends AEIP**. The same applies to the transaction list (COTRN00C). |
+| KD-11 | PF7 on page 1 sets NEXT-PAGE-YES. A following PF8 therefore blanks the rows before reaching end of file and shows `You have reached the bottom of the page...` with an empty list. ENTER re-lists. |
 | FR-USR-LST-07 | PF3 → admin menu (COADM01C). File errors → `Unable to lookup User...`. |
 
 ### FR-USR-ADD — Add user (CU01, COUSR01C, map COUSR01/COUSR1A)
