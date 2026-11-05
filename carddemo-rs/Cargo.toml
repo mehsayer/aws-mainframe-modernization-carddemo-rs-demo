@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+cobol = { path = "crates/cobol" }
+vsam = { path = "crates/vsam" }
+cics = { path = "crates/cics" }
+online = { path = "crates/online" }
+batch = { path = "crates/batch" }
+rust_decimal = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+anyhow = "1"
+thiserror = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.29"
+crossterm = "0.28"
+
+[profile.release]
+debug = false

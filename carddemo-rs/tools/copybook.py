@@ -170,7 +170,7 @@ def md(paths):
                 if n["redefines"]:
                     notes.append(f"REDEFINES {n['redefines']}")
                 name = "&nbsp;" * (2 * depth) + n["name"]
-                print(f"| {n['offset'] + 1} | {n['len']} | {name} | {describe(n)} | {', '.join(notes)} |")
+                print(f"| {n['offset'] - rec['offset'] + 1} | {n['len']} | {name} | {describe(n)} | {', '.join(notes)} |")
 
 
 def to_json(paths):
@@ -182,8 +182,13 @@ def to_json(paths):
             for depth, n in flatten(rec):
                 fields.append({k: n.get(k) for k in (
                     "name", "level", "offset", "len", "pic", "usage", "occurs",
-                    "redefines", "digits", "scale", "signed", "kind")} | {"depth": depth,
+                    "redefines", "digits", "scale", "signed", "kind", "value")} | {"depth": depth,
                     "group": not n.get("pic")})
+            if not fields:  # elementary 01-level item
+                fields = [{k: rec.get(k) for k in ("name", "level", "offset", "len", "pic", "usage", "occurs",
+                          "redefines", "digits", "scale", "signed", "kind", "value")} | {"depth": 0, "group": False}]
+            for f in fields:
+                f["offset"] -= rec["offset"]
             res[rec["name"]] = {"file": p, "len": rec["len"], "fields": fields}
     json.dump(res, sys.stdout, indent=1)
 

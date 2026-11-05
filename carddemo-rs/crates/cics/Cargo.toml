@@ -1,0 +1,11 @@
+[package]
+name = "cics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cobol.workspace = true
+vsam.workspace = true
+chrono.workspace = true
+thiserror.workspace = true

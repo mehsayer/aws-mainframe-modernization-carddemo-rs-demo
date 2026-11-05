@@ -1,0 +1,17 @@
+[package]
+name = "carddemo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cobol.workspace = true
+vsam.workspace = true
+cics.workspace = true
+online.workspace = true
+batch.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+chrono.workspace = true

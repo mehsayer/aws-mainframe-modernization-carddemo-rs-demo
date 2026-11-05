@@ -1,0 +1,12 @@
+[package]
+name = "online"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cobol.workspace = true
+vsam.workspace = true
+cics.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true

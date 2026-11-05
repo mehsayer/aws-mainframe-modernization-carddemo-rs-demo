@@ -1,0 +1,12 @@
+[package]
+name = "batch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cobol.workspace = true
+vsam.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true
+anyhow.workspace = true

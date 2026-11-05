@@ -1,0 +1,8 @@
+[package]
+name = "cobol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rust_decimal.workspace = true
