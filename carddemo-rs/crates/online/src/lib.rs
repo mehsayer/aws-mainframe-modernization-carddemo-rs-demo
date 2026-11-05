@@ -1,6 +1,7 @@
 //! The CardDemo online (CICS) programs, translated paragraph by paragraph.
 pub mod common;
 pub mod signon;
+pub mod users;
 
 use cics::{MapCatalog, Program, Region};
 use std::collections::HashMap;
@@ -11,6 +12,10 @@ pub fn programs() -> HashMap<&'static str, Program> {
     p.insert("COSGN00C", signon::cosgn00c);
     p.insert("COMEN01C", signon::comen01c);
     p.insert("COADM01C", signon::coadm01c);
+    p.insert("COUSR00C", users::cousr00c);
+    p.insert("COUSR01C", users::cousr01c);
+    p.insert("COUSR02C", users::cousr02c);
+    p.insert("COUSR03C", users::cousr03c);
     p
 }
 
