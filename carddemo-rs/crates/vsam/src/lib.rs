@@ -13,7 +13,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 
 mod catalog;
-pub use catalog::{Aix, Dataset, CATALOG, CICS_FILES};
+pub use catalog::{dataset as catalog_dataset, Aix, Dataset, CATALOG, CICS_FILES};
 
 /// CICS-style response codes (EIBRESP values).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
