@@ -23,3 +23,9 @@ Metrics come from `carddemo-rs/tools/usage.py`, which reads the Claude Code sess
 - Note: TRANSACT contains the blank initialisation record from DALYTRAN.PS.INIT (first row of the transaction list).
 - Note: account/card number inputs have no JUSTIFY: users must type all 11/16 digits.
 - Deviation: EXPORT.DATA KSDS (KEYS(4 28)) is represented as a fixed-length sequential file in write order.
+| 2026-11-05 18:32 | 4 | carddemo binary: ratatui TUI, CLI (reset/job/batch/online/script), internal reader for CR00 reports | | |
+| 2026-11-05 18:35 | 1,6 | requirements v1.1; manual test suite PDF (40 cases, all FR groups covered) | | |
+| 2026-11-05 18:45 | 8 | progress presentation PDF (17 slides) | 1.1 (session) | 367k (session) |
+
+Session 1 totals (tools/usage.py): ≈1.1 h active, 194 turns, 212 tool calls, 367k output tokens, 90.9M cache-read tokens.
+Per-phase breakdown: `python3 carddemo-rs/tools/phase_metrics.py`.
