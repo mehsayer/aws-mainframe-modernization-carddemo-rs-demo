@@ -18,7 +18,7 @@
 | ID | Requirement |
 |-----|------------------------------|
 | FR-SGN-01 | First entry: show an empty sign-on screen with the cursor in User ID. The screen also shows the application id and system id. |
-| FR-SGN-02 | ENTER with a blank user id → `Please enter User ID ...` (cursor User ID). With a blank password → `Please enter Password ...` (cursor Password). |
+| FR-SGN-02 | ENTER with a blank user id → `Please enter User ID ...` (cursor User ID). With a blank password → `Please enter Password ...` (cursor Password). *Note:* the password field is defined with FSET and `INITIAL='________'`. If the user does not erase it, the underscores are transmitted and the result is `Wrong Password. Try again ...`. |
 | FR-SGN-03 | The user id and password are converted to upper case before lookup and comparison. |
 | FR-SGN-04 | Read USRSEC by user id. If it is not found → `User not found. Try again ...`. Any other error → `Unable to verify the User ...`. |
 | FR-SGN-05 | Wrong password → `Wrong Password. Try again ...` (cursor Password). |

@@ -10,3 +10,7 @@ vsam.workspace = true
 cics.workspace = true
 rust_decimal.workspace = true
 chrono.workspace = true
+
+
+[dev-dependencies]
+batch.workspace = true
