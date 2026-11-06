@@ -5,7 +5,8 @@ author: "Illia Burov"
 date: "November 2026"
 theme: metropolis
 aspectratio: 169
-fontsize: 9pt
+fontsize: 10pt
+classoption: t
 mainfont: "Noto Sans"
 monofont: "JetBrains Mono"
 header-includes:
@@ -17,46 +18,62 @@ header-includes:
   - \newunicodechar{≈}{\ensuremath{\approx}}
   - \newunicodechar{×}{\ensuremath{\times}}
   - \newunicodechar{✓}{\ensuremath{\checkmark}}
+  - \usepackage{etoolbox}
   - \metroset{block=fill}
+  - \setbeamersize{text margin left=10mm, text margin right=10mm}
+  - \addtobeamertemplate{frametitle}{}{\vspace{2mm}}
+  - \AtBeginEnvironment{itemize}{\setlength{\itemsep}{2pt}}
+  - \AtBeginEnvironment{enumerate}{\setlength{\itemsep}{2pt}}
+  - \AtBeginEnvironment{longtable}{\small}
+  - \setlength{\LTpre}{0pt}
+  - \setlength{\LTpost}{4pt}
+  - \makeatletter\def\verbatim@font{\small\ttfamily}\makeatother
+  - |
+    ```{=latex}
+    \newcommand{\colhead}[1]{{\color{mDarkTeal}\bfseries #1}\par\vspace{3pt}}
+    \newcommand{\footer}[1]{\par\vfill\parbox{0.9\linewidth}{\scriptsize\color{black!55}#1}\par\vspace{1mm}}
+    \newcommand{\keypoint}[1]{\par\vspace{6pt}{\bfseries #1}\par}
+    ```
 ---
 
 ## In one slide
 
 ::: columns
-:::: {.column width="50%"}
-**What we did**
+:::: {.column width="48%"}
+\colhead{What we did}
 
 - Took a complete mainframe application: a credit-card system in **COBOL**, with online screens,
   nightly batch jobs and mainframe data files
-- Had an AI coding agent, **Claude Code**, translate it into **Rust**, a modern, safe, fast language
-- Required **proof**: the old and new programs run on the same data and must produce the same output
+- Had an AI coding agent, **Claude Code**, translate it into **Rust**, a modern, safe language
+- Required **proof**: old and new programs run on the same data and must give the same output
 ::::
-:::: {.column width="46%"}
-**What we got**
+:::: {.column width="48%"}
+\colhead{What we got}
 
 - All **30 programs** translated, working and tested
-- **Identical results**: 40 of 40 output comparisons against the original COBOL
+- **40 of 40** output comparisons identical to the original
 - **41 of 41** test cases passed
-- **12 defects** found in the original, documented, not silently changed
-- About **2 hours** of AI working time, with one engineer supervising
+- **12 defects** found in the original and documented
+- About **2.5 hours** of AI working time, one engineer supervising
 ::::
 :::
 
-\vspace{0.6em}
-**Recommendation:** run a second pilot on one of *our own* legacy systems, using the same method.
+\keypoint{Recommendation: run a second pilot on one of our own legacy systems, with the same method.}
 
 ## Why legacy code is a business risk
 
 ::: columns
-:::: {.column width="50%"}
+:::: {.column width="48%"}
+\colhead{The situation}
+
 - Core business rules live in decades-old COBOL, PL/I or RPG code
 - The people who wrote it are retiring; few new engineers learn these languages
 - Mainframe capacity and licences are a large, fixed cost
-- Manual rewrites are slow and risky: requirements are buried in the code, and small differences
-  in rounding, dates or edge cases break the business
+- Manual rewrites are slow and risky: rules are buried in the code, and small differences in
+  rounding, dates or edge cases break the business
 ::::
-:::: {.column width="46%"}
-**What a good solution must do**
+:::: {.column width="48%"}
+\colhead{What a good solution must do}
 
 1. Understand the old code, *including its quirks*
 2. Produce maintainable code in a modern language
@@ -68,81 +85,77 @@ header-includes:
 
 ## The original application: what CardDemo is for
 
-**CardDemo** is the core system of a **credit-card issuer**, the kind a bank runs on its mainframe.
-It keeps track of who the customers are, which cards and accounts they hold, what they spent,
-and what they owe.
+**CardDemo** is the core system of a **credit-card issuer**, the kind a bank runs on its mainframe:
+who the customers are, which cards and accounts they hold, what they spent and what they owe.
 
 ::: columns
 :::: {.column width="48%"}
-**Who uses it**
+\colhead{Who uses it}
 
-- **Bank staff** at their desks, through green-screen terminals: look up and update customer accounts
-  and cards, enter transactions, take bill payments, request reports
-- **Administrators**: manage which staff may sign on (user ids, passwords, roles)
+- **Bank staff**, through green-screen terminals: accounts, cards, transactions, bill payments, reports
+- **Administrators**: which staff may sign on, and with which role
 - **The nightly batch**: unattended programs that process the day's card activity
 ::::
 :::: {.column width="48%"}
-**What it holds**
+\colhead{What it holds}
 
-- 50 customers, each with an account and a credit card (sample data)
-- Account balances, credit limits, cash limits, billing-cycle totals
+- Customers, their accounts and credit cards
+- Balances, credit and cash limits, billing-cycle totals
 - Every card transaction: purchases, returns, payments, interest
-- Transaction types and categories, interest-rate groups
+- Transaction types, categories, interest-rate groups
 - Staff user ids and roles
 ::::
 :::
 
-AWS published it as a realistic test case for mainframe modernization: it uses the same technology
-(COBOL, CICS screens, VSAM files, JCL batch jobs) as real banking systems.
+\footer{AWS published CardDemo as a realistic test case for mainframe modernization: it uses the same technology
+(COBOL, CICS screens, VSAM files, JCL batch jobs) as real banking systems.}
 
-## A day in the life of the system {.shrink}
+## A day in the life of the system
 
 ::: columns
 :::: {.column width="48%"}
-**During the day: online screens**
+\colhead{During the day: online screens}
 
-- **Sign on** and see a menu that depends on your role
-- **Accounts:** view an account with its customer, change limits, addresses, phone numbers
-- **Cards:** list cards, view details, block a card or change the name and expiry date
-- **Transactions:** browse, view, add a transaction manually
-- **Bill payment:** pay off an account's balance in full
-- **Reports:** request a transaction report for a month, a year or any date range
-- **User administration:** add, change, delete staff users
+- **Sign on**: the menu depends on your role
+- **Accounts**: view; change limits, address, phones
+- **Cards**: list, view, block, change name or expiry
+- **Transactions**: browse, view, add manually
+- **Bill payment**: pay off a balance in full
+- **Reports**: request a report for any period
+- **Users**: add, change, delete staff users
 ::::
 :::: {.column width="48%"}
-**At night: the batch cycle**
+\colhead{At night: the batch cycle}
 
-1. **Posting:** check each of the day's card transactions (valid card? over the limit? expired?),
-   post the good ones to the accounts, put the rest on a reject list
-2. **Interest:** calculate monthly interest per account and category, add it as transactions
-3. **Combine:** merge the day's and the interest transactions into the master file
-4. **Statements:** one statement per customer, as a printable text and as a web page
-5. **Reports:** transaction report with page, account and grand totals
-6. **Migration export / import** of all data for another branch
+1. **Posting**: check the day's transactions (card valid? limit? expiry?), post or reject them
+2. **Interest**: monthly interest per account and category
+3. **Combine** the day's and the interest transactions
+4. **Statements**: one per customer, as text and web page
+5. **Reports**: with page, account and grand totals
+6. **Export / import** of all data for another branch
 ::::
 :::
 
 ## What was translated
 
 | | Original (COBOL, mainframe) | Translation (Rust) |
-|---|---|---|
+|------|-----------------------|-----------------------|
 | Online screens | 17 programs (IBM CICS), 17 screen layouts | 17 modules + terminal screen engine |
 | Nightly batch | 13 programs + JCL job scripts | 13 modules + job runner |
-| Data | VSAM files, EBCDIC encoding, packed decimals | Embedded database, same record layouts, same bytes |
+| Data | VSAM files, EBCDIC encoding, packed decimals | Embedded database, same record layouts and bytes |
 | Size | ≈ 27,000 lines | ≈ 10,800 lines (incl. generated code) |
 
 The application is **AWS CardDemo**, a public sample built to represent real mainframe banking systems.
 The original code is unchanged in the repository (`cobol/`), next to the translation (`rust/`).
 
-\vspace{0.5em}
-{\scriptsize CardDemo © Amazon.com, Inc. or its affiliates, used under the Apache License 2.0. The Rust translation is a
-derived work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web Services.}
+\footer{CardDemo © Amazon.com, Inc. or its affiliates, used under the Apache License 2.0. The Rust translation is a derived
+work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web Services.}
 
 ## How the AI worked: plan first, prove at the end
 
 \begin{center}
-\begin{tikzpicture}[node distance=4mm, every node/.style={font=\footnotesize, align=center},
-  box/.style={draw, rounded corners, fill=blue!8, minimum height=11mm, text width=19mm},
+\begin{tikzpicture}[node distance=3.5mm, every node/.style={font=\footnotesize, align=center},
+  box/.style={draw, rounded corners, fill=blue!8, minimum height=12mm, text width=18.5mm},
   hum/.style={box, fill=orange!20}, arr/.style={-{Stealth[length=2mm]}, thick}]
 \node[box] (a) {Read and inventory all code};
 \node[hum, right=of a] (b) {\textbf{Human approves the plan}};
@@ -155,26 +168,28 @@ derived work by Illia Burov. This pilot is not affiliated with or endorsed by Am
 \end{tikzpicture}
 \end{center}
 
-- The AI asked what to include before writing any code. A person chose: base application, terminal
-  screens, embedded database, keep the original's behaviour exactly.
-- Every phase ended in a saved, reviewable step (18+ commits) with a written log of decisions.
-- Deliverables were generated as documents for people: requirements, test suite, demo guide, this report.
+- Before writing code, the AI asked what to include. A person chose the scope: base application,
+  terminal screens, embedded database, the original's behaviour kept exactly.
+- Every phase ended in a saved, reviewable step (25 commits), with a written log of decisions.
+- The AI also produced the documents people need: requirements, test suite, demo guide, this report.
 
 ## Results at a glance
 
 ::: columns
 :::: {.column width="48%"}
+\colhead{Measured results}
+
 | Measure | Result |
-|---|--:|
+|----------------------|----------:|
 | Programs translated | 30 / 30 |
-| Output comparisons vs. COBOL | 40 / 40 identical |
+| Comparisons vs. COBOL | 40 / 40 identical |
 | Manual test cases | 41 / 41 passed |
-| Automated test suites | 20, all passing |
+| Automated test suites | 21, all passing |
 | Defects found in the original | 12 |
-| AI working time | ≈ 1.9 h |
+| AI working time | ≈ 2.4 h |
 ::::
 :::: {.column width="48%"}
-**Documents produced by the AI**
+\colhead{Documents produced by the AI}
 
 - Requirements specification: 26 pages, 165 functional requirements
 - Manual test suite with execution log
@@ -187,107 +202,111 @@ derived work by Illia Burov. This pilot is not affiliated with or endorsed by Am
 ## Proof: the old and new systems side by side
 
 | Nightly job | What is compared | Result |
-|---|---|---|
+|-----------------|--------------------------------------------|------------|
 | Daily posting | updated accounts, balances, transactions, rejected items | ✓ identical |
 | Interest calculation | accounts, generated interest transactions | ✓ identical |
 | Transaction report | 519-line printed report | ✓ identical |
 | Customer statements | 50 statements, text and web version (7,900 lines) | ✓ identical |
 | Data export / import | migration file, re-imported files, error file | ✓ identical |
-| File print utilities | 5 programs incl. packed-decimal outputs | ✓ identical |
+| File print utilities | 5 programs, incl. packed-decimal outputs | ✓ identical |
 
-The original COBOL is compiled with a free COBOL compiler and run **on the same data, with the same clock**.
-Anyone can repeat this check with one command (see the live demo).
+The original COBOL is compiled with a free COBOL compiler and run **on the same data, with the same
+clock**. Anyone can repeat the check with one command (see the live demo).
 
 ## What the AI found that people had missed
 
 ::: columns
-:::: {.column width="50%"}
-**In the original system** (kept, documented as *known defects*)
+:::: {.column width="48%"}
+\colhead{In the original system}
+
+Kept and documented as *known defects*:
 
 - Interest for the last account is never saved
-- The transaction report counts the last amount twice
-- Updating a card resets its security code to 000
-- Two programs **do not compile** as shipped
+- The report counts the last amount twice
+- A card update resets its security code to 000
 - Saving an account moves its group id into the ZIP-code field
+- Two programs do not compile as shipped
 - ... 12 in total
 ::::
-:::: {.column width="46%"}
-**In its own translation** (found and fixed by the comparison)
+:::: {.column width="48%"}
+\colhead{In its own translation}
 
-- 9 subtle differences, e.g. what is in unused bytes of a record, or a message cut at 75 instead of 78 characters
-- None were visible in normal tests. All were caught by **running the original**
-- 8 test-case descriptions were also corrected against the original code
-- An AI **code review** (scoped by `CLAUDE.md` to the Rust code) then found 10 more issues, all fixed with tests
+Found by running the original, and fixed:
+
+- 9 subtle differences, e.g. unused bytes of a record, or a message cut at 75 instead of 78 characters
+- None was visible in normal tests
+- 8 test-case texts corrected against the original
+- An AI **code review**, scoped by `CLAUDE.md` to the Rust code, found 10 more issues, all fixed with tests
 ::::
 :::
 
-**Lesson:** the value is not only in writing code fast, but in *verifying* it automatically.
+\keypoint{The value is not only in writing code fast, but in verifying it automatically.}
 
 ## CLAUDE.md: the project rulebook for the AI
 
 ::: columns
-:::: {.column width="45%"}
-`CLAUDE.md` is a plain-text file in the repository. Claude Code reads it at the start of **every**
-session. It turns one person's experience into standing instructions for every future AI session:
+:::: {.column width="48%"}
+\colhead{What it is}
 
-- **Scope:** what the AI may change and what is read-only
+A plain-text file in the repository, read by Claude Code at the start of **every** session:
+
+- **Scope**: what may change, what is read-only
 - **How to build, test and prove** the system
-- **Review policy:** what to review and what never to touch
-- **Lessons learned:** rules found the hard way, so no session repeats a mistake
+- **Review policy**: what to review, what never
+- **Lessons learned**: no mistake is repeated
 ::::
-:::: {.column width="51%"}
-\footnotesize
+:::: {.column width="48%"}
+\colhead{Excerpt}
+
+\begingroup\footnotesize
 ```text
 ## Code review
-When asked to review code, review only rust/.
-- cobol/ is the original source and the
-  specification. Never report findings
-  against it and never propose changes.
-- A behaviour that differs from the COBOL
-  is a Rust bug, even if the COBOL looks
-  wrong. Known defects (KD-nn) are kept
-  on purpose; do not report them.
-
-## Translation rules (learned the hard way)
-- Storage without VALUE is binary zeros ...
+Review only rust/.
+- cobol/ is the original source and
+  the specification: never report
+  findings against it.
+- A difference from the COBOL is a
+  Rust bug. Known defects (KD-nn)
+  are kept on purpose.
 ```
+\endgroup
 ::::
 :::
 
-**Why it matters for scale:** the same rulebook makes many sessions, teams and systems behave
-consistently. It is reviewed and versioned like code.
+\keypoint{Why it matters: one reviewed, versioned rulebook keeps every session and team consistent.}
 
 ## Human oversight built into the workflow
 
 ::: columns
-:::: {.column width="50%"}
-- **Plan approval:** no code until a person accepted the plan and the scope
-- **Checkpoints:** each step is a separate commit that can be reviewed or undone; nothing is published
-  without being asked
-- **Budget limits:** the AI was told to stop at 85% of the usage quota and write a hand-over note.
-  Work resumed the next day exactly where it stopped
-- **Memory and logs:** decisions, findings and metrics are written down, not kept in someone's head
+:::: {.column width="48%"}
+\colhead{Control points}
+
+- **Plan approval**: no code until a person accepted plan and scope
+- **Checkpoints**: every step is a commit that can be reviewed or undone; nothing is published unasked
+- **Budget limits**: the AI stopped at 85% of the usage quota and wrote a hand-over note; work resumed
+  exactly there the next day
+- **Memory and logs**: decisions and findings are written down
 ::::
-:::: {.column width="46%"}
-**Claude Code Remote Control**
+:::: {.column width="48%"}
+\colhead{Claude Code Remote Control}
 
 - The work runs on the company workstation; the code stays there
-- From the **Claude mobile app**, the supervising engineer follows the session in progress, answers
-  the AI's questions and approves steps while away from the desk
-- Long translation runs no longer need someone sitting at the screen
+- From the **Claude mobile app**, the engineer follows the session, answers the AI's questions and
+  approves steps while away from the desk
+- Long runs no longer need someone sitting at the screen
 ::::
 :::
 
 ## Time and tokens
 
 | Session | Work | AI time | Output tokens |
-|---|----------------------------------|----:|-----:|
+|------|------------------------------------------------|-------:|---------:|
 | 1 | Analysis, requirements, translation of all 30 programs, test suite, report | 1.1 h | 367k |
 | 2 | Proof against the original COBOL, test execution, fixes | 0.5 h | 137k |
-| 3 | Repository restructure, demo tooling and guide, `CLAUDE.md`, this presentation | 0.3 h | 55k |
-| **Total** | | **≈ 1.9 h** | **≈ 0.56M** |
+| 3 | Restructure, demo tooling and guide, `CLAUDE.md`, code-review fixes, this presentation | 0.8 h | 115k |
+| **Total** | | **≈ 2.4 h** | **≈ 0.62M** |
 
-- Measured from the Claude Code session logs (time with pauses over 10 minutes removed).
+- Measured from the Claude Code session logs (pauses over 10 minutes removed).
 - Token cost depends on the subscription or API price list in use.
 - The engineer's own time went into decisions and reviews, not into typing code.
 
@@ -295,12 +314,12 @@ consistently. It is reviewed and versioned like code.
 
 \begin{center}
 \begin{tikzpicture}
-\begin{axis}[xbar, width=12cm, height=6.2cm, bar width=8pt, xmin=0, xmax=190,
-  xlabel={output tokens (thousands)}, xlabel style={font=\scriptsize},
-  symbolic y coords={Restructure + demo + deck,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
-  ytick=data, yticklabel style={font=\scriptsize}, xticklabel style={font=\scriptsize},
-  nodes near coords, nodes near coords style={font=\scriptsize}, enlarge y limits=0.08]
-\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (55.0,Restructure + demo + deck)};
+\begin{axis}[xbar, width=10.5cm, height=6cm, bar width=8pt, xmin=0, xmax=190,
+  xlabel={output tokens (thousands)}, xlabel style={font=\small},
+  symbolic y coords={Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
+  ytick=data, yticklabel style={font=\small}, xticklabel style={font=\small},
+  nodes near coords, nodes near coords style={font=\small}, enlarge y limits=0.08]
+\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (115.0,Restructure + demo + review fixes)};
 \end{axis}
 \end{tikzpicture}
 \end{center}
@@ -310,35 +329,38 @@ The online screens were the largest part: 17 interactive programs with many vali
 ## Risks and mitigations
 
 | Risk | Mitigation in this method |
-|---|---|
+|---------------------------|---------------------------------------------|
 | AI produces plausible but wrong code | Run old and new on the same data; outputs must be identical |
 | Hidden rules in old code are lost | Requirements are written first, from the code, and reviewed |
 | Original defects get "fixed" silently | Defects are kept and documented; fixing them is a business decision |
-| Parts that cannot run outside the mainframe (online CICS screens) | Screens drawn from the original layouts; 41-case test suite; next: comparison on a test mainframe |
+| Parts that cannot run off the mainframe (online CICS screens) | Screens drawn from the original layouts; 41-case test suite; next: comparison on a test mainframe |
 | Source code confidentiality | Code stays on company machines; only what is sent to the model leaves them, under the company's agreement with the vendor |
 | Over-reliance on one tool | Output is ordinary Rust code plus documents; any team can maintain it |
 
 ## From pilot to programme
 
 ::: columns
-:::: {.column width="50%"}
-**Next pilot (4–6 weeks)**
+:::: {.column width="48%"}
+\colhead{Next pilot (4–6 weeks)}
 
 1. Pick one of our legacy systems: bounded, with test data
 2. Write its `CLAUDE.md`: scope, target stack, review rules
 3. Set up the comparison harness: old vs. new on the same data
-4. Translate, verify, document, using the same steps as this pilot
-5. Review with the system owners; decide on go-live criteria
+4. Translate, verify, document, as in this pilot
+5. Review with the system owners; agree go-live criteria
 ::::
-:::: {.column width="46%"}
-**What we need**
+:::: {.column width="48%"}
+\colhead{What we need}
 
 - One engineer who knows the system, part time
 - Access to the code and representative test data
 - Claude Code licences for the team
-- A test environment for the original system (for online comparison)
+- A test environment for the original system
 
-**Success criteria:** identical outputs on agreed test data, test suite passed, owners sign off.
+\vspace{6pt}
+\colhead{Success criteria}
+
+Identical outputs on agreed test data, test suite passed, owners sign off.
 ::::
 :::
 
@@ -353,15 +375,14 @@ python3 demo/demo.py online     # the online screens
 
 Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.
 
-\vspace{1.5em}
-**Questions:** Illia Burov
+\keypoint{Questions: Illia Burov}
 
 # Appendix
 
 ## Technical architecture
 
 | Component | Replaces | Lines |
-|-------|-------------------------------------|----|
+|-------|-------------------------------------|----:|
 | `cobol` | COBOL data rules: decimals, EBCDIC; records generated from copybooks | 1,677 |
 | `vsam` | VSAM indexed files, on SQLite | 556 |
 | `cics` | CICS screens (from the original BMS files), transfers, file control | 833 |
@@ -369,13 +390,13 @@ Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.
 | `batch` | the 13 batch programs and JCL jobs | 1,886 |
 | `carddemo` | the application: terminal screens, job runner | 440 |
 
-Verification: `rust/difftest/run.py` (GnuCOBOL comparison), `cargo test` (20 suites, incl. the 41 manual
-cases as scripted terminal sessions and multi-user tests).
+Verification: `rust/difftest/run.py` (GnuCOBOL comparison) and `cargo test` (21 suites, including the
+41 manual cases as scripted terminal sessions and the multi-user tests).
 
 ## Known defects of the original (selection)
 
 | ID | Where | Effect |
-|-------|----------|---------------------------|
+|-------|--------------|-----------------------------|
 | KD-01 | Interest calculation | the last account's interest is never written back |
 | KD-02/03 | Transaction report | last amount counted twice; no final account total |
 | KD-07 | Card update screen | the card security code is reset to 000 |
@@ -384,4 +405,4 @@ cases as scripted terminal sessions and multi-user tests).
 | KD-12 | Export / import | the programs do not compile as shipped |
 | KD-13 | Account update screen | the group id is saved into the ZIP-code field |
 
-All 12 are in the requirements specification, with the exact behaviour that the translation reproduces.
+All 12 are in the requirements specification, with the exact behaviour the translation reproduces.
