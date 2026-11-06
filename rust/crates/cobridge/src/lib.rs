@@ -134,10 +134,14 @@ pub fn run(t: &mut Task) -> Cr {
     eib[EIB_AID] = aid_byte(t.eibaid);
     let entry: extern "C" fn() -> c_int = cdcics;
     eib[EIB_CDCICS..EIB_CDCICS + 8].copy_from_slice(&(entry as usize).to_ne_bytes());
-    let mut ca = if t.commarea.is_empty() { vec![0u8; 1] } else { t.commarea.clone() };
+    // The commarea is handed over in a zero-filled area of the CICS maximum (32 KB), EIBCALEN keeps the
+    // real length. Several programs copy their program area from beyond EIBCALEN (KD-16): on CICS that
+    // reads whatever storage follows; here it reads zeros instead of memory outside the buffer.
+    let mut ca = vec![0u8; 32 * 1024];
+    ca[..t.commarea.len()].copy_from_slice(&t.commarea);
 
     let mut ctx = Ctx {
-        task: t as *mut Task as *mut Task<'static>,
+        task: (t as *mut Task).cast::<Task<'static>>(),
         transfer: None,
         browses: HashMap::new(),
         handle: HashMap::new(),

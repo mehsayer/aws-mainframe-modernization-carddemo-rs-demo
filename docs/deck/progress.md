@@ -271,7 +271,7 @@ Kept and documented as *known defects*:
 
 - Last account's interest is never saved
 - The report counts the last amount twice
-- Card update resets the security code
+- Card update wipes the security code
 - Account update moves the group id
 - Two programs do not compile
 - ... 12 in total
@@ -446,7 +446,7 @@ Verification: `rust/difftest/run.py` (GnuCOBOL comparison) and `cargo test` (21 
 |-------|--------------|-----------------------------|
 | KD-01 | Interest calculation | the last account's interest is never written back |
 | KD-02/03 | Transaction report | last amount counted twice; no final account total |
-| KD-07 | Card update screen | the card security code is reset to 000 |
+| KD-07 | Card update screen | the card security code is wiped |
 | KD-08 | Account update screen | the "blank phone number" test checks the area code twice |
 | KD-10 | User / transaction lists | searching past the last record crashes the transaction |
 | KD-12 | Export / import | the programs do not compile as shipped |

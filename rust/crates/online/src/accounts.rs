@@ -459,6 +459,21 @@ fn acu_receive(t: &mut Task, s: &mut Acu, c: &mut CarddemoCommarea, map: &mut Ma
     }
 }
 
+/// COBOL `FUNCTION UPPER-CASE(FUNCTION TRIM(a)) = FUNCTION UPPER-CASE(FUNCTION TRIM(b))`:
+/// TRIM removes leading/trailing spaces only (an all-space value keeps one space); the shorter operand
+/// is padded with spaces for the comparison.
+fn trim_eq(a: &[u8], b: &[u8]) -> bool {
+    let t = |v: &[u8]| -> Vec<u8> {
+        let x = text::trim(v).to_ascii_uppercase();
+        if x.is_empty() { vec![b' '] } else { x }
+    };
+    let (mut x, mut y) = (t(a), t(b));
+    let n = x.len().max(y.len());
+    x.resize(n, b' ');
+    y.resize(n, b' ');
+    x == y
+}
+
 fn up(v: &[u8]) -> Vec<u8> {
     let mut x = v.to_ascii_uppercase();
     for b in x.iter_mut() {
@@ -494,6 +509,14 @@ fn compare_old_new(s: &Acu) -> bool {
     }
     for (_, k) in SCREEN {
         if k.starts_with("ssn") || k.starts_with("ph") {
+            continue;
+        }
+        if *k == "group" {
+            // UPPER-CASE(TRIM(new)) = UPPER-CASE(TRIM(old)). TRIM removes spaces only: a blank input is
+            // LOW-VALUES and never equals the stored spaces, so such an account always counts as changed (KD-15)
+            if !trim_eq(&s.nv(k), &o.get(k)) {
+                return false;
+            }
             continue;
         }
         let mut n = vec![b' '; o.get(k).len()];
@@ -883,10 +906,12 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
             }
         }
         b'S' | b'E' => {
+            // 3320-UNPROTECT-FEW-ATTRS: everything editable except the customer id and the country
             map.attr("ACCTSID", AttrByte::ProtFset);
             for f in &all {
                 map.attr(f, AttrByte::UnprotFset);
             }
+            map.attr("ACSCTRY", AttrByte::ProtFset);
         }
         _ => {
             map.attr("ACCTSID", AttrByte::ProtFset);
@@ -897,14 +922,14 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
     }
     map.attr("ACSTNUM", AttrByte::ProtFset);
     let first_bad = all.iter().find(|f| s.bad.contains_key(**f)).copied();
-    let cursor = if s.acct_flg != Flg::Valid {
-        "ACCTSID"
-    } else if let Some(f) = first_bad {
-        f
-    } else if s.found {
+    // POSITION CURSOR: FOUND-ACCOUNT-DATA is an 88 on WS-INFO-MSG that 3250 has already replaced, so only
+    // NO-CHANGES-DETECTED (the error message) puts the cursor on the status; WHEN OTHER -> account id
+    let cursor = if s.msg == "No change detected with respect to values fetched." {
         "ACSTTUS"
-    } else {
+    } else if s.acct_flg != Flg::Valid {
         "ACCTSID"
+    } else {
+        first_bad.unwrap_or("ACCTSID")
     };
     map.cursor(cursor);
     if s.acct_flg == Flg::NotOk {

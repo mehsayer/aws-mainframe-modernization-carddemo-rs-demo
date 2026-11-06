@@ -51,7 +51,7 @@ fn card_update_and_user_add_leave_filler_as_binary_zeros() {
     t.key(Aid::Pf(5));
     assert_eq!(t.field("INFOMSG"), "Changes committed to database");
     let raw = r.vsam.read("CARDDAT", card.as_bytes()).unwrap();
-    assert!(raw[91..150].iter().all(|&b| b == 0), "CARD-UPDATE-RECORD FILLER X(59)");
+    assert!(raw[91..150].iter().all(|&b| b == 0), "CARD-UPDATE-RECORD FILLER X(59): {:?}", &raw[91..150]);
 
     let mut a = Term::signon(&r, "ADMIN001", "PASSWORD");
     a.typ("OPTION", "2").enter();

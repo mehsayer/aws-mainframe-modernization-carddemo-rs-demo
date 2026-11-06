@@ -103,11 +103,11 @@ CASES = [
   ("Account `99999999999`, Enter.", "`Account:99999999999 not found in Cross ref file.  Resp:000000013  Reas:0000` (two spaces before `Resp:` and `Reas:`; the message is cut at 75 characters)."),
   ("Press F3.", "Main menu."),
 ]),
-("TC-ACU-01", "Account update: fetch and no-change", "FR-ACU-01..06", U, [
+("TC-ACU-01", "Account update: fetch and no-change", "FR-ACU-01..06, KD-15", U, [
   ("Option `2`.", "Info `Enter or update id of account to update`."),
   ("Account `0`, Enter.", "`Account Number if supplied must be a 11 digit Non-Zero Number`"),
   ("Account `00000000001`, Enter.", "Details shown, info `Update account details presented above.`"),
-  ("Press Enter without changes.", "`No change detected with respect to values fetched.`"),
+  ("Press Enter without changes.", "`FICO Score: should be between 300 and 850`: the account's group id is blank, so it never compares as unchanged (KD-15) and the fields are validated."),
 ]),
 ("TC-ACU-02", "Account update: validation order", "FR-ACU-07a..07i, FR-ACU-12", U + "; account 00000000001 fetched", [
   ("Set Primary Card Holder `X`, Enter.", "`FICO Score: should be between 300 and 850` (sample data FICO is invalid and is checked first)."),
@@ -151,7 +151,7 @@ CASES = [
   ("Name `JOHN 2`, Enter.", "`Card name can only contain alphabets and spaces`"),
   ("Expiry month `13`, Enter.", "`Card expiry month must be between 1 and 12`"),
   ("Valid values (status `N`), Enter.", "Info `Changes validated.Press F5 to save`."),
-  ("Press F5.", "Info `Changes committed to database`. The record's CVV is now `000` (KD-07)."),
+  ("Press F5.", "Info `Changes committed to database`. The record's CVV is overwritten with spaces (KD-07)."),
   ("Press Enter.", "Back on the card list (called from the list)."),
 ]),
 # ---------------------------------------------------------------- transactions

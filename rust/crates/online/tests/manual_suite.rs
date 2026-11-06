@@ -352,7 +352,8 @@ fn tc_acu_01() {
     t.typ("ACCTSID", "00000000001").enter();
     assert_eq!(t.field("INFOMSG"), "Update account details presented above.", "step 3");
     t.enter();
-    assert_eq!(t.msg(), "No change detected with respect to values fetched.", "step 4");
+    // KD-15: blank group id -> always "changed"; the sample FICO score then fails validation
+    assert_eq!(t.msg(), "FICO Score: should be between 300 and 850", "step 4 (KD-15)");
 }
 
 #[test]
@@ -491,7 +492,7 @@ fn tc_cdu_01() {
     t.key(Aid::Pf(5));
     assert_eq!(t.field("INFOMSG"), "Changes committed to database", "step 7");
     let c = cobol::copybooks::CardRecord::from_bytes(&r.vsam.read("CARDDAT", card.as_bytes()).unwrap());
-    assert_eq!(c.card_cvv_cd(), b"000", "step 7: CVV 000 (KD-07)");
+    assert_eq!(c.card_cvv_cd(), b"   ", "step 7: CVV overwritten with spaces (KD-07)");
     t.enter();
     assert_eq!(t.map(), "CCRDLIA", "step 8");
 }

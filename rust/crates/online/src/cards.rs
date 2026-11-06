@@ -1163,8 +1163,10 @@ fn upd_write(t: &mut Task, s: &mut Upd) -> UpdResult {
     u.initialize();
     u.set_card_num(&s.d(O_NEW, D_CARD));
     u.set_card_acct_id(&s.cc_acct);
-    // KD-07: CCUP-NEW-CVV-CD is never filled; the CVV is written as zero
-    u.set_card_cvv_cd_n(Dec::ZERO);
+    // KD-07: CCUP-NEW-CVV-CD is never filled (INITIALIZE CCUP-NEW-DETAILS: spaces); MOVE CARD-CVV-CD-N
+    // TO CARD-UPDATE-CVV-CD copies those bytes, so the CVV becomes three spaces. (IBM with NUMPROC(NOPFD)
+    // would also set the zone of the last digit: '  0'; GnuCOBOL and NUMPROC(PFD) copy the bytes.)
+    u.buf[27..30].copy_from_slice(b"   ");
     u.set_card_embossed_name(&s.d(O_NEW, D_NAME));
     let mut exp = s.d(O_NEW, D_YEAR);
     exp.push(b'-');
