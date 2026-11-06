@@ -29,3 +29,27 @@ Metrics come from `carddemo-rs/tools/usage.py`, which reads the Claude Code sess
 
 Session 1 totals (tools/usage.py): ≈1.1 h active, 194 turns, 212 tool calls, 367k output tokens, 90.9M cache-read tokens.
 Per-phase breakdown: `python3 carddemo-rs/tools/phase_metrics.py`.
+
+## Session 2 (2026-11-06)
+
+| When (UTC+1) | Phase | Event |
+|---|---|---|
+| 11:05 | 7 | gmp-devel installed by the user; GnuCOBOL 3.2 compiles the original batch programs |
+| 11:28 | 7 | `carddemo-rs/difftest/run.py`: 13 batch programs, all outputs identical after fixes (commit fa42553) |
+| 11:31 | 7 | clippy clean (all targets); multi-session tests (commit 401d457) |
+| 11:40 | 6b | manual test suite executed, 41/41 pass; execution log filled (commit cc5fb5d) |
+| 11:42 | 8 | deck updated with session 2 results and metrics |
+
+Findings:
+- Fidelity gaps fixed (found by the differential test): storage without VALUE must be binary zeros; INITIALIZE
+  must skip FILLER/REDEFINES; CBSTM03A HTML used a 1-space delimiter (original: 2); CBCUS01C/CBACT01C missed a
+  DISPLAY; CBIMPORT missed the "Errors Written" line.
+- Fidelity gaps fixed (found by executing the suite): COTRN00C browse key for a non-numeric search (X'00', not
+  spaces); account messages: two spaces before `Resp:` and cut at 75 characters.
+- KD-12: CBEXPORT/CBIMPORT name a WORKING-STORAGE field as RECORD KEY; they do not compile as shipped.
+- Source note: CUSTREC.cpy/CSLKPCDY.cpy contain tabs (width 4 intended).
+- Accepted GnuCOBOL differences (normalised in the harness): DISPLAY of signed fields, INITIALIZE sign, X'00'
+  in SYSOUT, real hundredths under COB_CURRENT_DATE.
+
+Totals after session 2 (tools/usage.py): ≈1.6 h active, 374 turns, 399 tool calls, 504k output tokens,
+132.2M cache-read tokens.
