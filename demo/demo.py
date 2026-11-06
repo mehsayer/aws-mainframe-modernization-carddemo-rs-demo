@@ -47,10 +47,24 @@ def write_lines(path, lines):
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="latin-1")
 
 
+def ensure_rust():
+    """Build carddemo; cargo does nothing when it is up to date, so an old binary is never used."""
+    r = subprocess.run(["cargo", "build", "--release", "-q", "-p", "carddemo"], cwd=ROOT / "rust")
+    if r.returncode:
+        sys.exit("Building the Rust programs failed (see the messages above).")
+
+
 def ensure_built():
-    if not (h.BUILD / "CBSTM03A").exists() or not h.BIN.exists():
-        say("Building the programs (first time only, about a minute) ...")
+    """The batch demo: the Rust binary and the original batch COBOL programs."""
+    ensure_rust()
+    if not (h.BUILD / "CBSTM03A").exists():
+        say("Compiling the original COBOL batch programs (first time only, about a minute) ...")
         h.build()
+
+
+def cobol_modules_dir():
+    """Same rule as the runtime (cobridge::modules_dir) and cicsprep.py."""
+    return Path(os.environ.get("CARDDEMO_COBOL_MODULES") or ROOT / "rust" / "cobridge" / "build" / "modules")
 
 
 # ------------------------------------------------------------------ COBOL
@@ -118,7 +132,7 @@ def cobol():
 # ------------------------------------------------------------------ Rust
 
 def rust():
-    ensure_built()
+    ensure_rust()
     out = OUT / "rust"
     shutil.rmtree(out, ignore_errors=True)
     home = out / "work"
@@ -172,8 +186,8 @@ def compare():
 
 
 def online(cobol=False):
-    ensure_built()
-    if cobol and not (ROOT / "rust" / "cobridge" / "build" / "modules" / "COSGN00C.so").exists():
+    ensure_rust()
+    if cobol and not (cobol_modules_dir() / "COSGN00C.so").exists():
         say("Translating and compiling the original COBOL screen programs (first time only) ...")
         subprocess.run([sys.executable, str(ROOT / "rust" / "cobridge" / "cicsprep.py")], check=True)
     # separate data stores, so the two systems can run side by side
@@ -187,12 +201,19 @@ def online(cobol=False):
 
 
 def online_compare():
-    ensure_built()
+    """online.py builds what it needs (COBOL modules, test programs); its progress and any error message
+    go to stderr, which is shown as it happens; the summary comes from its report."""
     say("Replaying the scripted terminal sessions on the Rust and on the original COBOL programs ...")
-    r = subprocess.run([sys.executable, str(ROOT / "rust" / "difftest" / "online.py")], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, str(ROOT / "rust" / "difftest" / "online.py")], stdout=subprocess.PIPE, text=True)
+    shown = False
     for l in r.stdout.splitlines():
         if l.startswith(("|", "Screens compared", "**Overall")):
             print("    " + l.replace("**", ""))
+            shown = True
+    if r.returncode and not shown:
+        print(f"{RED}online.py failed{END}: see the messages above")
+    elif r.returncode:
+        print(f"Details: rust/difftest/out-online/report.md")
     return r.returncode == 0
 
 

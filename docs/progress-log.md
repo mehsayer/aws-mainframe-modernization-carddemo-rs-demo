@@ -91,3 +91,13 @@ Re-verified: 21 test suites, clippy clean, difftest identical, manual suite 41/4
   NFR-15, deck updated.
 
 Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.
+
+### Code review (2026-11-06, `/code-review high`): all 10 findings fixed
+- The bridge loads libcob at run time (dlopen): every build works without GnuCOBOL; no rpath problems.
+- `COB_CURRENT_DATE` only with `CARDDEMO_NOW` (GnuCOBOL freezes the clock otherwise).
+- COBOL stdout *and* stderr go to the sysout file (opened once, `cobridge::set_sysout`); the TUI restores the
+  terminal if libcob exits.
+- demo.py: always `cargo build` (no stale binary), online-compare shows progress and errors and builds only what
+  it needs, module directory rule shared with the runtime and cicsprep (`CARDDEMO_COBOL_MODULES`).
+- execute.py runs the scripted suite once (inside online.py, on Rust and COBOL); TC-DIF-01 logged as
+  "Pass (step 2)", the manual step 1 is stated as not executed.

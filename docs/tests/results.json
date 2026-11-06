@@ -4,171 +4,171 @@
  "results": {
   "TC-SGN-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-SGN-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-SGN-03": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-SGN-04": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-SGN-05": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-MEN-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-MEN-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-MEN-03": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-MEN-04": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ADM-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-03": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-04": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-05": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-06": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-USR-07": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ACV-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ACV-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ACU-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ACU-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-ACU-03": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-CDL-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-CDL-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-CDV-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-CDV-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-CDU-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-TRL-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-TRV-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-TRA-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-TRA-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BIL-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-RPT-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-01": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-02": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-03": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-04": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-05": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-06": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-07": {
    "result": "Pass",
-   "notes": "scripted terminal"
+   "notes": "scripted terminal; same case on the original COBOL: passes"
   },
   "TC-BAT-08": {
    "result": "Pass",
    "notes": "difftest/run.py: 40 comparisons, all identical"
   },
   "TC-DIF-01": {
-   "result": "Pass",
-   "notes": "difftest/online.py: 338/338 screens identical"
+   "result": "Pass (step 2)",
+   "notes": "step 2: 338/338 screens identical; step 1 (interactive side by side) is manual, not run by the script"
   }
  }
 }

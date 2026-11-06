@@ -95,7 +95,7 @@ if os.path.exists(os.path.join(HERE, "results.json")):
     import json
     log = json.load(open(os.path.join(HERE, "results.json")))
     res = log["results"]
-    passed = sum(1 for v in res.values() if v["result"] == "Pass")
+    passed = sum(1 for v in res.values() if v["result"].startswith("Pass"))
     out.append(f"Executed {log['date']} by {log['tester']}: the online and batch cases run through the same "
                "3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test "
                "per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with "

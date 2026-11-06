@@ -23,7 +23,16 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 APP = ROOT / "cobol" / "app"
 BUILD = HERE / "build"
-SRC_OUT, CPY_OUT, MOD_OUT = BUILD / "src", BUILD / "cpy", BUILD / "modules"
+SRC_OUT, CPY_OUT = BUILD / "src", BUILD / "cpy"
+
+
+def modules_dir():
+    """Where the compiled modules go and where the runtime loads them from (same rule as
+    cobridge::modules_dir): CARDDEMO_COBOL_MODULES, else rust/cobridge/build/modules."""
+    return Path(os.environ.get("CARDDEMO_COBOL_MODULES") or BUILD / "modules")
+
+
+MOD_OUT = modules_dir()
 COBC = ["cobc", "-std=ibm", "-fsign=EBCDIC", "-I", str(CPY_OUT)]
 
 # CICS response codes (DFHRESP)

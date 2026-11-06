@@ -16,43 +16,109 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
-use std::sync::Once;
+use std::sync::{Mutex, Once, OnceLock};
 use vsam::{Browse, Resp};
 
 extern "C" {
-    fn cob_init(argc: c_int, argv: *mut *mut c_char);
-    fn cob_resolve(name: *const c_char) -> *mut c_void;
-    fn cob_call(name: *const c_char, argc: c_int, argv: *mut *mut c_void) -> c_int;
-    fn cob_cancel(name: *const c_char);
-    fn cob_get_param_size(n: c_int) -> c_int;
-    fn cob_get_param_data(n: c_int) -> *mut c_void;
-    fn cob_get_s64_param(n: c_int) -> i64;
-    fn cob_put_s64_param(n: c_int, v: i64);
-    fn cob_get_param_constant(n: c_int) -> c_int;
+    fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
+    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     fn dup(fd: c_int) -> c_int;
     fn dup2(from: c_int, to: c_int) -> c_int;
     fn close(fd: c_int) -> c_int;
     fn fflush(stream: *mut c_void) -> c_int;
 }
 
-/// COBOL DISPLAY output (stdout) goes to the file named by `CARDDEMO_COBOL_SYSOUT` while a program runs,
-/// so it cannot disturb a full-screen terminal UI. Without the variable it stays on stdout.
+const RTLD_NOW: c_int = 2;
+const RTLD_GLOBAL: c_int = 0x100;
+
+/// The GnuCOBOL runtime functions the bridge uses. libcob is loaded at run time (dlopen), so nothing in
+/// the workspace needs GnuCOBOL to build; only running the COBOL programs does.
+struct Cob {
+    init: unsafe extern "C" fn(c_int, *mut *mut c_char),
+    resolve: unsafe extern "C" fn(*const c_char) -> *mut c_void,
+    call: unsafe extern "C" fn(*const c_char, c_int, *mut *mut c_void) -> c_int,
+    cancel: unsafe extern "C" fn(*const c_char),
+    param_size: unsafe extern "C" fn(c_int) -> c_int,
+    param_data: unsafe extern "C" fn(c_int) -> *mut c_void,
+    get_s64: unsafe extern "C" fn(c_int) -> i64,
+    put_s64: unsafe extern "C" fn(c_int, i64),
+    param_constant: unsafe extern "C" fn(c_int) -> c_int,
+}
+
+static COB: OnceLock<Result<Cob, String>> = OnceLock::new();
+
+/// libcob: `CARDDEMO_LIBCOB` (a path), else the usual shared-library names.
+fn load_cob() -> Result<Cob, String> {
+    let mut names: Vec<String> = std::env::var("CARDDEMO_LIBCOB").into_iter().collect();
+    names.extend(["libcob.so.4", "libcob.so", "libcob.dylib"].map(String::from));
+    let mut handle = std::ptr::null_mut();
+    for n in &names {
+        let c = CString::new(n.as_str()).map_err(|e| e.to_string())?;
+        handle = unsafe { dlopen(c.as_ptr(), RTLD_NOW | RTLD_GLOBAL) };
+        if !handle.is_null() {
+            break;
+        }
+    }
+    if handle.is_null() {
+        return Err("GnuCOBOL runtime (libcob) not found: install GnuCOBOL 3.x or set CARDDEMO_LIBCOB".into());
+    }
+    let sym = |n: &str| -> Result<*mut c_void, String> {
+        let c = CString::new(n).unwrap();
+        let p = unsafe { dlsym(handle, c.as_ptr()) };
+        if p.is_null() {
+            Err(format!("libcob has no {n} (GnuCOBOL 3.x needed)"))
+        } else {
+            Ok(p)
+        }
+    };
+    unsafe {
+        Ok(Cob {
+            init: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int, *mut *mut c_char)>(sym("cob_init")?),
+            resolve: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*const c_char) -> *mut c_void>(sym("cob_resolve")?),
+            call: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*const c_char, c_int, *mut *mut c_void) -> c_int>(sym("cob_call")?),
+            cancel: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*const c_char)>(sym("cob_cancel")?),
+            param_size: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int) -> c_int>(sym("cob_get_param_size")?),
+            param_data: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int) -> *mut c_void>(sym("cob_get_param_data")?),
+            get_s64: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int) -> i64>(sym("cob_get_s64_param")?),
+            put_s64: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int, i64)>(sym("cob_put_s64_param")?),
+            param_constant: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int) -> c_int>(sym("cob_get_param_constant")?),
+        })
+    }
+}
+
+fn cob() -> &'static Cob {
+    COB.get_or_init(load_cob).as_ref().expect("libcob checked by cobridge::check()")
+}
+
+/// Where COBOL DISPLAY output and libcob messages go while a program runs (see [`set_sysout`]).
+static SYSOUT: Mutex<Option<std::fs::File>> = Mutex::new(None);
+
+/// Send the COBOL programs' stdout and stderr (DISPLAY, libcob warnings and errors) to `path` while they
+/// run, so they cannot disturb a full-screen terminal UI. The file is opened once.
+pub fn set_sysout(path: &std::path::Path) -> std::io::Result<()> {
+    let f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    *SYSOUT.lock().unwrap_or_else(|e| e.into_inner()) = Some(f);
+    Ok(())
+}
+
+/// stdout/stderr redirected to the sysout file for the duration of one program call.
 struct SysoutRedirect {
-    saved: c_int,
+    saved: [c_int; 2],
 }
 
 impl SysoutRedirect {
     fn start() -> Option<SysoutRedirect> {
         use std::os::fd::AsRawFd;
-        let path = std::env::var_os("CARDDEMO_COBOL_SYSOUT")?;
-        let file = std::fs::OpenOptions::new().create(true).append(true).open(path).ok()?;
+        let guard = SYSOUT.lock().unwrap_or_else(|e| e.into_inner());
+        let fd = guard.as_ref()?.as_raw_fd();
         unsafe {
             fflush(std::ptr::null_mut());
-            let saved = dup(1);
-            if saved < 0 {
+            let saved = [dup(1), dup(2)];
+            if saved.iter().any(|&s| s < 0) {
                 return None;
             }
-            dup2(file.as_raw_fd(), 1);
+            dup2(fd, 1);
+            dup2(fd, 2);
             Some(SysoutRedirect { saved })
         }
     }
@@ -62,8 +128,10 @@ impl Drop for SysoutRedirect {
     fn drop(&mut self) {
         unsafe {
             fflush(std::ptr::null_mut());
-            dup2(self.saved, 1);
-            close(self.saved);
+            for (target, saved) in [(1, self.saved[0]), (2, self.saved[1])] {
+                dup2(saved, target);
+                close(saved);
+            }
         }
     }
 }
@@ -94,15 +162,32 @@ pub fn available() -> bool {
     modules_dir().join("COSGN00C.so").exists()
 }
 
+/// Everything needed to run the COBOL programs: the modules and the GnuCOBOL runtime.
+pub fn check() -> Result<(), String> {
+    if !available() {
+        return Err(format!(
+            "COBOL modules not built in {}: run  python3 rust/cobridge/cicsprep.py  (needs GnuCOBOL)",
+            modules_dir().display()
+        ));
+    }
+    COB.get_or_init(load_cob).as_ref().map(|_| ()).map_err(Clone::clone)
+}
+
 static INIT: Once = Once::new();
 
 fn init() {
     INIT.call_once(|| {
         std::env::set_var("COB_LIBRARY_PATH", modules_dir());
-        // FUNCTION CURRENT-DATE in the COBOL programs uses the same clock as the Rust runtime
-        let now = online::common::now();
-        std::env::set_var("COB_CURRENT_DATE", now.format("%Y/%m/%d %H:%M:%S").to_string());
-        unsafe { cob_init(0, std::ptr::null_mut()) };
+        // A fixed test clock (CARDDEMO_NOW) is passed on to FUNCTION CURRENT-DATE. GnuCOBOL treats
+        // COB_CURRENT_DATE as a frozen clock, so it is only set when the Rust side is frozen too.
+        if std::env::var_os("CARDDEMO_NOW").is_some() {
+            let now = online::common::now();
+            std::env::set_var("COB_CURRENT_DATE", now.format("%Y/%m/%d %H:%M:%S").to_string());
+        }
+        if let Err(e) = check() {
+            panic!("{e}");
+        }
+        unsafe { (cob().init)(0, std::ptr::null_mut()) };
     });
 }
 
@@ -157,7 +242,7 @@ fn pack7(v: u32) -> [u8; 4] {
 pub fn run(t: &mut Task) -> Cr {
     init();
     let name = CString::new(t.program.trim()).expect("program name");
-    if unsafe { cob_resolve(name.as_ptr()) }.is_null() {
+    if unsafe { (cob().resolve)(name.as_ptr()) }.is_null() {
         return Err(Transfer::Abend("APCT".into()));
     }
     let now = online::common::now();
@@ -187,11 +272,11 @@ pub fn run(t: &mut Task) -> Cr {
     let prev = CTX.with(|c| c.replace(&mut ctx));
     let mut args = [eib.as_mut_ptr() as *mut c_void, ca.as_mut_ptr() as *mut c_void];
     let sysout = SysoutRedirect::start();
-    unsafe { cob_call(name.as_ptr(), 2, args.as_mut_ptr()) };
+    unsafe { (cob().call)(name.as_ptr(), 2, args.as_mut_ptr()) };
     drop(sysout);
     // CICS gives every task a fresh copy of WORKING-STORAGE; a CALLed GnuCOBOL program keeps its state
     // (and any PERFORM return addresses left by a HANDLE CONDITION GO TO) until it is cancelled
-    unsafe { cob_cancel(name.as_ptr()) };
+    unsafe { (cob().cancel)(name.as_ptr()) };
     CTX.with(|c| c.set(prev));
     match ctx.transfer.take() {
         Some(tr) => Err(tr),
@@ -203,8 +288,8 @@ pub fn run(t: &mut Task) -> Cr {
 // ---------------------------------------------------------------------------- argument access
 
 unsafe fn param_bytes<'x>(i: c_int) -> &'x mut [u8] {
-    let p = cob_get_param_data(i) as *mut u8;
-    let n = cob_get_param_size(i).max(0) as usize;
+    let p = (cob().param_data)(i) as *mut u8;
+    let n = (cob().param_size)(i).max(0) as usize;
     if p.is_null() {
         return &mut [];
     }
@@ -249,13 +334,13 @@ impl Cmd {
         cobol::text::s(self.bytes(o)).trim().to_string()
     }
     fn num(&self, o: &str) -> Option<i64> {
-        self.arg(o).map(|i| unsafe { cob_get_s64_param(i) })
+        self.arg(o).map(|i| unsafe { (cob().get_s64)(i) })
     }
     fn put_num(&self, o: &str, v: i64) {
         // LENGTH OF ... is passed BY CONTENT (a constant): nothing to give back
         if let Some(i) = self.arg(o) {
-            if unsafe { cob_get_param_constant(i) } == 0 {
-                unsafe { cob_put_s64_param(i, v) }
+            if unsafe { (cob().param_constant)(i) } == 0 {
+                unsafe { (cob().put_s64)(i, v) }
             }
         }
     }

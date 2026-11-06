@@ -456,17 +456,18 @@ fn run_submitted(home: &Path, seed: Option<PathBuf>, deck: &[Vec<u8>]) -> String
     }
 }
 
-/// The original COBOL programs on the CICS bridge; their DISPLAY output goes to `<home>/cobol-sysout.log`.
-#[cfg(feature = "cobol")]
+/// The original COBOL programs on the CICS bridge. Their DISPLAY output and any libcob message go to
+/// `<home>/cobol-sysout.log`; if libcob ends the process (runtime error, STOP RUN), the terminal is
+/// restored on the way out.
 fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
-    if !cobridge::available() {
-        bail!("COBOL modules not built: run  python3 rust/cobridge/cicsprep.py  (needs GnuCOBOL)");
+    cobridge::check().map_err(anyhow::Error::msg)?;
+    cobridge::set_sysout(&home.join("cobol-sysout.log"))?;
+    extern "C" {
+        fn atexit(f: extern "C" fn()) -> std::ffi::c_int;
     }
-    std::env::set_var("CARDDEMO_COBOL_SYSOUT", home.join("cobol-sysout.log"));
+    extern "C" fn restore_terminal() {
+        ratatui::restore();
+    }
+    unsafe { atexit(restore_terminal) };
     Ok(cobridge::region(v))
-}
-
-#[cfg(not(feature = "cobol"))]
-fn cobol_region(_v: vsam::Vsam, _home: &Path) -> Result<cics::Region> {
-    bail!("this carddemo was built without the `cobol` feature (GnuCOBOL bridge)")
 }

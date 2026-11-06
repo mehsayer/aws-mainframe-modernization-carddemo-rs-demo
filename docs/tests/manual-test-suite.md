@@ -583,45 +583,45 @@ Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run th
 
 | Test case | Date | Tester | Result | Notes |
 |---|---|---|---|---|
-| TC-SGN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-SGN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-SGN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-SGN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-SGN-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-MEN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-MEN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-MEN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-MEN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ADM-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-USR-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ACV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ACV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ACU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ACU-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-ACU-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-CDL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-CDL-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-CDV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-CDV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-CDU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-TRL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-TRV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-TRA-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-TRA-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BIL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-RPT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
-| TC-BAT-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-SGN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-SGN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-SGN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-SGN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-SGN-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-MEN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-MEN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-MEN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-MEN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ADM-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-USR-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ACV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ACV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ACU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ACU-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-ACU-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-CDL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-CDL-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-CDV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-CDV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-CDU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-TRL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-TRV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-TRA-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-TRA-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BIL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-RPT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
+| TC-BAT-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal; same case on the original COBOL: passes |
 | TC-BAT-08 | 2026-11-06 | Claude Code (scripted) | Pass | difftest/run.py: 40 comparisons, all identical |
-| TC-DIF-01 | 2026-11-06 | Claude Code (scripted) | Pass | difftest/online.py: 338/338 screens identical |
+| TC-DIF-01 | 2026-11-06 | Claude Code (scripted) | Pass (step 2) | step 2: 338/338 screens identical; step 1 (interactive side by side) is manual, not run by the script |

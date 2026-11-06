@@ -9,7 +9,7 @@ data written to the files) must pass in both runs.
 
   python3 rust/difftest/online.py      # needs GnuCOBOL; builds the COBOL modules first
 """
-import os, re, shutil, subprocess, sys
+import json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -19,13 +19,31 @@ OUT = HERE / "out-online"
 TARGETS = ["manual_suite", "signon", "users", "cards_accounts", "transactions", "review_fixes"]
 
 
+TESTS = {}  # target -> region -> test name -> {"result": "ok"|"FAILED", "note": first panic line}
+
+
 def run(target, region, logdir):
+    print(f"  {target}: {region} ...", file=sys.stderr, flush=True)
     env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
-    r = subprocess.run(["cargo", "test", "--release", "-q", "-p", "online", "--test", target, "--", "--test-threads=1"],
+    r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
                        cwd=RS, env=env, capture_output=True, text=True)
-    m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", r.stdout)
+    out = r.stdout + r.stderr
+    # a test's result can be pushed to a later line by DISPLAY output of the COBOL programs
+    tests = {}
+    starts = list(re.finditer(r"^test (\w+) \.\.\. ", out, re.M))
+    for k, m in enumerate(starts):
+        chunk = out[m.end():starts[k + 1].start() if k + 1 < len(starts) else len(out)]
+        res = re.search(r"(ok|FAILED)\s*$", chunk.split("\n\n")[0], re.M)
+        tests[m.group(1)] = {"result": res.group(1) if res else "?", "note": ""}
+    for m in re.finditer(r"thread '(\w+)'.*?panicked at [^\n]*\n([^\n]*)", out, re.S):
+        if m.group(1) in tests:
+            tests[m.group(1)]["note"] = m.group(2).strip()[:120]
+    TESTS.setdefault(target, {})[region] = tests
+    m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
+    if not m:
+        sys.stderr.write(out[-3000:])
     return (int(m.group(1)), int(m.group(2))) if m else (0, -1)
 
 
@@ -72,6 +90,7 @@ def same_screen(x, y):
 
 
 def main():
+    print("  building the original COBOL screen programs ...", file=sys.stderr, flush=True)
     b = subprocess.run([sys.executable, str(RS / "cobridge" / "cicsprep.py")], capture_output=True, text=True)
     if b.returncode:
         sys.exit(b.stdout + b.stderr)
@@ -114,6 +133,8 @@ def main():
            (f" (including {len(notes)} accepted compiler difference(s), below)." if notes else "."), ""] + notes + ["",
            f"**Overall: {'all screens identical, all tests pass on both' if ok else 'differences found'}**", ""] + details
     (OUT / "report.md").write_text("\n".join(md) + "\n")
+    (OUT / "results.json").write_text(json.dumps({"ok": ok, "screens": total_screens, "identical": same_screens,
+                                                  "tests": TESTS}, indent=1))
     print("\n".join(md))
     sys.exit(0 if ok else 1)
 

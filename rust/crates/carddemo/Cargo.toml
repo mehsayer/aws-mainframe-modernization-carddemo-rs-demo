@@ -15,10 +15,6 @@ clap.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
 chrono.workspace = true
-cobridge = { path = "../cobridge", optional = true }
-
-[features]
-# `carddemo online --cobol`: the original COBOL programs on the CICS bridge (needs GnuCOBOL's libcob).
-# Build without it: cargo build --release --no-default-features
-default = ["cobol"]
-cobol = ["dep:cobridge"]
+# `carddemo online --cobol`: the original COBOL programs on the CICS bridge. libcob is loaded at run
+# time, so building needs no GnuCOBOL; only `--cobol` does.
+cobridge = { path = "../cobridge" }

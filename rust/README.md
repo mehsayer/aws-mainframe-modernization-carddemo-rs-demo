@@ -47,7 +47,8 @@ indexed files, a C stub for CEE3ABD, and a PARM wrapper for CBACT04C; CBSTM03A's
 
 `cobridge/cicsprep.py` translates the original CICS COBOL programs (`EXEC CICS` becomes a call through a
 procedure pointer in the EIB) and compiles them with GnuCOBOL; `crates/cobridge` runs them on the same CICS
-runtime, screens and data store as the Rust programs (libcob via FFI). The project's own `DFHAID`,
+runtime, screens and data store as the Rust programs (libcob, loaded at run time; building needs no
+GnuCOBOL). The project's own `DFHAID`,
 `DFHBMSCA`, `DFHATTR` and `DFHEIBLK` copybooks (`cobridge/copy/`) and a CEEDAYS (`cobridge/ceedays.c`) stand in
 for the IBM-supplied parts.
 

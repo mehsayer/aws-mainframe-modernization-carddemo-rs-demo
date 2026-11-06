@@ -53,8 +53,10 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   behaviour there instead of guessing.
 - **CICS gives each task fresh WORKING-STORAGE**; the bridge CANCELs every COBOL program after its task.
   Invalid data moved into numeric fields is compiler-dependent: document it, do not "fix" it.
-- `rust/crates/cobridge` links GnuCOBOL's libcob; `carddemo` uses it through the default feature `cobol`
-  (`--no-default-features` builds without GnuCOBOL).
+- `rust/crates/cobridge` loads GnuCOBOL's libcob at run time (dlopen; `CARDDEMO_LIBCOB` overrides the
+  path), so every build works without GnuCOBOL; only running the COBOL programs needs it. COBOL DISPLAY
+  output and libcob messages go to the file given to `cobridge::set_sysout` (the TUI uses
+  `<home>/cobol-sysout.log`). `COB_CURRENT_DATE` is set only when `CARDDEMO_NOW` freezes the Rust clock.
 
 ## Conventions
 
