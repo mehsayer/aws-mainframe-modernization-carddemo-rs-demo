@@ -2,7 +2,7 @@
 title: "CardDemo — Software Requirements Specification"
 subtitle: "Derived from the COBOL/CICS/VSAM source for the Rust re-implementation"
 date: "2026-11-06 — version 1.2"
-author: "Prepared with Claude Code"
+author: "Illia Burov (prepared with Claude Code)"
 toc: true
 toc-depth: 2
 numbersections: true

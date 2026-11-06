@@ -2,7 +2,7 @@
 title: "CardDemo (Rust) — Manual Test Suite"
 subtitle: "Test cases derived from the Software Requirements Specification v1.2"
 date: "2026-11-06 — version 1.1"
-author: "Prepared with Claude Code"
+author: "Illia Burov (prepared with Claude Code)"
 toc: true
 toc-depth: 2
 geometry: margin=2cm

@@ -16,4 +16,13 @@ python3 demo/demo.py online    # the online screens (sign on as USER0001 / PASSW
 
 Working with Claude Code in this repository: see [`CLAUDE.md`](CLAUDE.md).
 
-The original CardDemo is © Amazon.com, Inc. or its affiliates, Apache License 2.0 (see `LICENSE`, `NOTICE`).
+Rust translation, demo and documentation: **Illia Burov**, with Claude Code.
+
+## License and attribution
+
+- The original CardDemo in `cobol/` is © Amazon.com, Inc. or its affiliates and is distributed unchanged under
+  the Apache License 2.0 (`LICENSE`, `NOTICE`); its copyright headers are kept as they are.
+- The Rust code in `rust/` is a derived work: a translation of the original programs, copybooks and screen
+  definitions, made by Illia Burov with Claude Code. It is distributed under the same Apache License 2.0.
+- This project is not affiliated with, sponsored by or endorsed by Amazon or Amazon Web Services.
+  "AWS" and "CardDemo" are used only to identify the original sample.

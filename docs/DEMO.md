@@ -1,5 +1,7 @@
 # CardDemo Live Demo Guide
 
+*Presenter: Illia Burov*
+
 This guide is for presenters and for audiences with only basic technical knowledge.
 Every step says what to type, what you will see, and what it means.
 

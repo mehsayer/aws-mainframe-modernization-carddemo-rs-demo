@@ -1,7 +1,7 @@
 ---
 title: "AI-Assisted Legacy Modernization"
-subtitle: "Pilot: a COBOL mainframe application translated to Rust with Claude Code"
-author: "Pilot report and proposal"
+subtitle: "Pilot report and proposal: a COBOL mainframe application translated to Rust with Claude Code"
+author: "Illia Burov"
 date: "November 2026"
 theme: metropolis
 aspectratio: 169
@@ -133,6 +133,10 @@ AWS published it as a realistic test case for mainframe modernization: it uses t
 
 The application is **AWS CardDemo**, a public sample built to represent real mainframe banking systems.
 The original code is unchanged in the repository (`cobol/`), next to the translation (`rust/`).
+
+\vspace{0.5em}
+{\scriptsize CardDemo © Amazon.com, Inc. or its affiliates, used under the Apache License 2.0. The Rust translation is a
+derived work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web Services.}
 
 ## How the AI worked: plan first, prove at the end
 
@@ -346,6 +350,9 @@ python3 demo/demo.py online     # the online screens
 ```
 
 Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.
+
+\vspace{1.5em}
+**Questions:** Illia Burov
 
 # Appendix
 
