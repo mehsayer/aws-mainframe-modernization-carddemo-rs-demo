@@ -23,6 +23,7 @@ extern "C" {
     fn cob_init(argc: c_int, argv: *mut *mut c_char);
     fn cob_resolve(name: *const c_char) -> *mut c_void;
     fn cob_call(name: *const c_char, argc: c_int, argv: *mut *mut c_void) -> c_int;
+    fn cob_cancel(name: *const c_char);
     fn cob_get_param_size(n: c_int) -> c_int;
     fn cob_get_param_data(n: c_int) -> *mut c_void;
     fn cob_get_s64_param(n: c_int) -> i64;
@@ -145,6 +146,9 @@ pub fn run(t: &mut Task) -> Cr {
     let prev = CTX.with(|c| c.replace(&mut ctx));
     let mut args = [eib.as_mut_ptr() as *mut c_void, ca.as_mut_ptr() as *mut c_void];
     unsafe { cob_call(name.as_ptr(), 2, args.as_mut_ptr()) };
+    // CICS gives every task a fresh copy of WORKING-STORAGE; a CALLed GnuCOBOL program keeps its state
+    // (and any PERFORM return addresses left by a HANDLE CONDITION GO TO) until it is cancelled
+    unsafe { cob_cancel(name.as_ptr()) };
     CTX.with(|c| c.set(prev));
     match ctx.transfer.take() {
         Some(tr) => Err(tr),

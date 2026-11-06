@@ -32,7 +32,7 @@
 | FR-MEN-01 | Show options 1–11 from COMEN02Y as `NN. <name>`: 1 Account View (COACTVWC), 2 Account Update (COACTUPC), 3 Credit Card List (COCRDLIC), 4 Credit Card View (COCRDSLC), 5 Credit Card Update (COCRDUPC), 6 Transaction List (COTRN00C), 7 Transaction View (COTRN01C), 8 Transaction Add (COTRN02C), 9 Transaction Reports (CORPT00C), 10 Bill Payment (COBIL00C), 11 Pending Authorization View (COPAUS0C). |
 | FR-MEN-02 | The option input (2 characters) is right-justified and zero-filled. Non-numeric, 0, or greater than 11 → `Please enter a valid option number...`. |
 | FR-MEN-03 | An option flagged admin-only (`A`) chosen by a regular user → `No access - Admin Only option... `. (No base option is flagged `A`.) |
-| FR-MEN-04 | Option 11 (COPAUS0C) first checks that the program is installed. *In the base scope it is not installed*, so the message is `This option Pending is not installed...` (red). The text is literally the option name up to its first space. |
+| FR-MEN-04 | Option 11 (COPAUS0C) first checks that the program is installed. *In the base scope it is not installed*, so the message is `This option Pending Authorization View is not installed...` (red): the option name up to its first two consecutive spaces. |
 | FR-MEN-05 | A program name starting with `DUMMY` → `This option <name-to-first-space>is coming soon ...` (green). |
 | FR-MEN-06 | Any other valid option: XCTL to that program with from-tran `CM00`, from-program `COMEN01C`, context 0. |
 | FR-MEN-07 | PF3 → XCTL to sign-on (COSGN00C). |
@@ -60,6 +60,7 @@
 | FR-USR-LST-06 | Hitting the end of the file while filling a page → `You have reached the bottom of the page...` (or `...top of the page...` going backward). The next-page flag is computed by reading one record ahead. |
 | KD-10 | ENDBR is issued without RESP. If STARTBR found nothing (search key beyond the last user), CICS raises INVREQ and the task **abends AEIP**. The same applies to the transaction list (COTRN00C). |
 | KD-11 | PF7 on page 1 sets NEXT-PAGE-YES. A following PF8 therefore blanks the rows before reaching end of file and shows `You have reached the bottom of the page...` with an empty list. ENTER re-lists. |
+| KD-14 | Admin menu (COADM01C): before the XCTL for an option it sets CDEMO-PGM-CONTEXT to 0. For options 5 and 6 (Db2 programs, not installed) the XCTL fails, HANDLE CONDITION PGMIDERR sends `This option is not installed ...` and returns that commarea, so the next Enter is treated as a first entry: the menu is redrawn and the input is ignored once. |
 | FR-USR-LST-07 | PF3 → admin menu (COADM01C). File errors → `Unable to lookup User...`. |
 
 ### FR-USR-ADD — Add user (CU01, COUSR01C, map COUSR01/COUSR1A)

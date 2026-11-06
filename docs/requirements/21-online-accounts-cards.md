@@ -30,7 +30,7 @@ They share these rules:
 | ID | Requirement |
 |-----|------------------------------|
 | FR-ACV-01 | First entry: show the screen with the info message `Enter or update id of account to display`. |
-| FR-ACV-02 | Input: account number (11). Blank or `*` → `Account number not provided` and the field is shown as a red `*`. Non-numeric or all zeros → `Account Filter must be a non-zero 11 digit number`. |
+| FR-ACV-02 | Input: account number (11). Blank or `*` → `No input received` (the prompt `Account number not provided` is set first and then overwritten) and the field is shown as a red `*`. Non-numeric or all zeros → `Account Filter must  be a non-zero 11 digit number` (two spaces before `be`). |
 | FR-ACV-03 | Lookup chain: XREF by account (CXACAIX) gives the customer id and card number (also stored in the commarea). Then the account master, then the customer master. Not-found messages (RESP/RESP2 as 9 digits left-justified in 10-byte fields; the result is cut at 75 characters): `Account:<id> not found in Cross ref file.  Resp:<resp>  Reas:<resp2>`, `Account:<id> not found in Acct Master file.Resp:<resp> Reas:<resp2>`, `CustId:<id> not found in customer master.Resp: <resp> REAS:<resp2>`. |
 | FR-ACV-04 | Displayed fields: account status, current balance, credit limit, cash credit limit, current cycle credit, current cycle debit, open, expiry and reissue dates, group id. Customer fields: id, SSN as `999-99-9999`, FICO score, date of birth, first, middle and last name, address lines 1–2, city (address line 3), state, zip, country, phone 1, phone 2, government id, EFT account id, primary card holder flag. |
 | FR-ACV-06 | *Map quirk:* map CACTVWA contains an unnamed field `LENGTH=9,POS=(1,1)` after the header fields. On a 3270 it overwrites row 1, columns 1–10 with nulls, so only the last letter of the transaction id (`W`) remains visible. |
@@ -43,8 +43,8 @@ They share these rules:
 | FR-CDV-01 | Entered from the card list (context ENTER, from-program COCRDLIC): the account and card from the commarea are used to read the card immediately. Both search fields are then protected. |
 | FR-CDV-02 | Entered any other way: the prompt `Please enter Account and Card Number` is shown in the info line. |
 | FR-CDV-03 | Account filter: blank, `*` or all zeros → `Account number not provided`. Non-numeric → `ACCOUNT FILTER,IF SUPPLIED MUST BE A 11 DIGIT NUMBER`. |
-| FR-CDV-04 | Card filter: blank, `*` or all zeros → `Card number not provided`. Non-numeric → `CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER`. Only the first error message is kept. Both fields are always validated, so both can be flagged red. |
-| FR-CDV-05 | If both filters are valid, the card is read by card number only; the account number is not cross-checked. Not found → `Did not find cards for this search condition` (both fields red). Found → info message ` Displaying requested details`, embossed name, expiry month and year (from `YYYY-MM-DD`), and card status (Y/N). |
+| FR-CDV-04 | Card filter: blank, `*` or all zeros → `Card number not provided`. Non-numeric → `CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER`. Only the first error message is kept, except that when both filters are blank the message becomes `No input received`. Both fields are always validated, so both can be flagged red. |
+| FR-CDV-05 | If both filters are valid, the card is read by card number only; the account number is not cross-checked. Not found → `Did not find cards for this search condition` (both fields red). Found → info message `   Displaying requested details` (three leading spaces), embossed name, expiry month and year (from `YYYY-MM-DD`), and card status (Y/N). |
 | FR-CDV-06 | PF3 → back to the caller (BR-AC-04). Other keys are treated as ENTER. |
 
 ## FR-CDL — Credit card list (CCLI, COCRDLIC, map COCRDLI/CCRDLIA)
@@ -98,7 +98,7 @@ S / E / N / C / L / F). One screen updates both the **account** record and its
 | ID | Requirement |
 |-----|------------------------------|
 | FR-ACU-01 | First entry: the info line shows `Enter or update id of account to update`. Only the account id field is enterable. |
-| FR-ACU-02 | Account id: blank or `*` → `Account number not provided`. Non-numeric or zero → `Account Number if supplied must be a 11 digit Non-Zero Number`. |
+| FR-ACU-02 | Account id: blank or `*` → `No input received` (overwrites the prompt `Account number not provided`). Non-numeric or zero → `Account Number if supplied must be a 11 digit Non-Zero Number`. |
 | FR-ACU-03 | Fetch: read XREF by account (CXACAIX) to get the customer id, then the account master, then the customer master. The not-found messages are the same as FR-ACV-03. Success → state S, info `Details of selected account shown above`. The old values are kept in the commarea. |
 | FR-ACU-04 | Editable fields in state S/E. Account: active status, open date (Y/M/D), credit limit, expiry date (Y/M/D), cash credit limit, reissue date (Y/M/D), current balance, current cycle credit, current cycle debit, group id. Customer: SSN (3/2/4), date of birth (Y/M/D), FICO score, first, middle and last name, address line 1, address line 2, state, zip, city, country, phone 1 (area/prefix/line), phone 2, government id, EFT account id, primary card holder flag. A field containing `*` or spaces is treated as empty. |
 | FR-ACU-05 | Monetary inputs are accepted in any NUMVAL-C form (sign, commas, decimal point) and redisplayed with `+ZZZ,ZZZ,ZZZ.99`. |

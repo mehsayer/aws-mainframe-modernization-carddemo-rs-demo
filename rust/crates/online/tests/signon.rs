@@ -27,7 +27,7 @@ fn signon_flows() {
     t.typ("OPTION", "99").enter();
     assert_eq!(t.msg(), "Please enter a valid option number...");
     t.typ("OPTION", "11").enter();
-    assert_eq!(t.msg(), "This option Pending is not installed...");
+    assert_eq!(t.msg(), "This option Pending Authorization View is not installed...");
     t.key(Aid::Pf(3));
     assert_eq!(t.map(), "COSGN0A");
     t.key(Aid::Pf(3));

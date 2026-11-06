@@ -197,6 +197,12 @@ fn menu(t: &mut Task, spec: &MenuSpec) -> Cr {
                         if t.program_exists(pgm) {
                             return Err(go(t, &mut ca));
                         }
+                        // The fields were set for the XCTL before it failed (PGMIDERR), so the commarea
+                        // returned by PGMIDERR-ERR-PARA has CDEMO-PGM-CONTEXT = 0: the next Enter is
+                        // treated as a first entry and only redraws the menu (KD-14).
+                        ca.set_cdemo_from_tranid(spec.tran.as_bytes());
+                        ca.set_cdemo_from_program(spec.pgm.as_bytes());
+                        ca.set_cdemo_pgm_context(b"0");
                         // PGMIDERR-ERR-PARA: send, then RETURN
                         map.color("ERRMSG", Color::Green);
                         message = "This option is not installed ...".into();
@@ -208,7 +214,9 @@ fn menu(t: &mut Task, spec: &MenuSpec) -> Cr {
                             return Err(go(t, &mut ca));
                         }
                         map.color("ERRMSG", Color::Red);
-                        message = format!("This option {first_word} is not installed...");
+                        // STRING ... CDEMO-MENU-OPT-NAME DELIMITED BY '  ' (two spaces)
+                        let name_2sp = cobol::text::s(cobol::text::until(name.as_bytes(), b"  "));
+                        message = format!("This option {name_2sp} is not installed...");
                     } else if pgm.starts_with("DUMMY") {
                         map.color("ERRMSG", Color::Green);
                         message = format!("This option {first_word}is coming soon ...");

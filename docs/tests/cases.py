@@ -43,17 +43,18 @@ CASES = [
   ("Press F7.", "`Invalid key pressed. Please see below...`"),
 ]),
 ("TC-MEN-03", "Optional module not installed", "FR-MEN-04", U, [
-  ("Type `11`, Enter.", "Red message `This option Pending is not installed...`"),
+  ("Type `11`, Enter.", "Red message `This option Pending Authorization View is not installed...`"),
 ]),
 ("TC-MEN-04", "Navigation and return", "FR-MEN-06, FR-MEN-07", U, [
   ("Type `1` (single digit), Enter.", "Account View screen (`CAVW`). The option was right-justified to `01`."),
   ("Press F3.", "Main menu."),
   ("Press F3.", "Sign-on screen."),
 ]),
-("TC-ADM-01", "Admin menu", "FR-ADM-01..04", A, [
+("TC-ADM-01", "Admin menu", "FR-ADM-01..04, KD-14", A, [
   ("Inspect the menu.", "Options 1-6 (User List/Add/Update/Delete (Security), Transaction Type ... (Db2))."),
   ("Type `5`, Enter.", "Green message `This option is not installed ...` (Db2 module out of scope)."),
-  ("Type `7`, Enter.", "`Please enter a valid option number...`"),
+  ("Type `7`, Enter.", "The menu is redrawn without a message: the input is ignored once after a not-installed option (KD-14)."),
+  ("Type `7`, Enter again.", "`Please enter a valid option number...`"),
   ("Press F3.", "Sign-on screen."),
 ]),
 # ---------------------------------------------------------------- users
@@ -94,8 +95,8 @@ CASES = [
 # ---------------------------------------------------------------- accounts
 ("TC-ACV-01", "Account view: input checks", "FR-ACV-01, -02, BR-AC-07", U, [
   ("Option `1`.", "Info `Enter or update id of account to display`. Row 1 shows only `W` of the transaction id (map quirk FR-ACV-06)."),
-  ("Enter with an empty account.", "`Account number not provided`, red `*` in the account field."),
-  ("Account `abc`, Enter.", "`Account Filter must be a non-zero 11 digit number`"),
+  ("Enter with an empty account.", "`No input received` (the original overwrites `Account number not provided`), red `*` in the account field."),
+  ("Account `abc`, Enter.", "`Account Filter must  be a non-zero 11 digit number`"),
 ]),
 ("TC-ACV-02", "Account view: display", "FR-ACV-03, -04", U + "; account view", [
   ("Account `00000000001`, Enter.", "Status `Y`, balance and limits in `+ZZZ,ZZZ,ZZZ.99` form (current balance `+        194.00`), dates, customer name, SSN as `999-99-9999`, address, phones."),
@@ -135,12 +136,12 @@ CASES = [
   ("Type `X` on a row, Enter.", "`INVALID ACTION CODE`"),
 ]),
 ("TC-CDV-01", "Card detail from the list", "FR-CDV-01, -05, -06", U + "; card list", [
-  ("`S` on row 1, Enter.", "Card detail: info ` Displaying requested details`, embossed name, expiry month/year, status; search fields protected."),
+  ("`S` on row 1, Enter.", "Card detail: info `   Displaying requested details` (three leading spaces), embossed name, expiry month/year, status; search fields protected."),
   ("Press F3.", "Card list."),
 ]),
 ("TC-CDV-02", "Card detail by keys", "FR-CDV-02..04", U, [
   ("Option `4`.", "Info `Please enter Account and Card Number`."),
-  ("Enter with both fields empty.", "`Account number not provided`, both fields red `*`."),
+  ("Enter with both fields empty.", "`No input received`, both fields red `*`."),
   ("Account `00000000001`, card `1234`, Enter.", "`CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER`"),
 ]),
 ("TC-CDU-01", "Card update cycle", "FR-CDU-01..07, KD-07", U + "; card list", [

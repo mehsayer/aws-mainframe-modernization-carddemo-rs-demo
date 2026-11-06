@@ -16,6 +16,7 @@ fn seed() -> PathBuf {
 fn tui_enter(t: &mut Term) {
     if t.s.next_transid.is_none() && t.s.screen.text.is_some() {
         t.r.run(&mut t.s, Some("CC00"), Aid::Enter);
+        log_screen(&t.s);
     } else {
         t.enter();
     }
@@ -140,7 +141,7 @@ fn tc_men_03() {
     let r = region();
     let mut t = user(&r);
     t.typ("OPTION", "11").enter();
-    assert_eq!(t.msg(), "This option Pending is not installed...", "step 1");
+    assert_eq!(t.msg(), "This option Pending Authorization View is not installed...", "step 1");
     assert_eq!(color(&t, "ERRMSG"), Color::Red, "step 1: red");
 }
 
@@ -165,10 +166,13 @@ fn tc_adm_01() {
     t.typ("OPTION", "5").enter();
     assert_eq!(t.msg(), "This option is not installed ...", "step 2");
     assert_eq!(color(&t, "ERRMSG"), Color::Green, "step 2: green");
+    // KD-14: the commarea came back with CDEMO-PGM-CONTEXT = 0, so this Enter only redraws the menu
     t.typ("OPTION", "7").enter();
-    assert_eq!(t.msg(), "Please enter a valid option number...", "step 3");
+    assert_eq!((t.msg().as_str(), t.field("OPTION").as_str()), ("", ""), "step 3: input ignored once (KD-14)");
+    t.typ("OPTION", "7").enter();
+    assert_eq!(t.msg(), "Please enter a valid option number...", "step 4");
     t.key(Aid::Pf(3));
-    assert_eq!(t.map(), "COSGN0A", "step 4");
+    assert_eq!(t.map(), "COSGN0A", "step 5");
 }
 
 // ------------------------------------------------------------------ users
@@ -300,11 +304,11 @@ fn tc_acv_01() {
     let row1 = t.s.screen.render()[0].clone();
     assert!(row1.trim_start().starts_with('W') && !row1.contains("Tran:"), "step 1: only 'W' of the header (map quirk): {row1}");
     t.enter();
-    assert_eq!(t.msg(), "Account number not provided", "step 2");
+    assert_eq!(t.msg(), "No input received", "step 2");
     assert_eq!(t.field("ACCTSID"), "*", "step 2: '*' in the account field");
     assert_eq!(color(&t, "ACCTSID"), Color::Red, "step 2: red");
     t.typ("ACCTSID", "abc").enter();
-    assert_eq!(t.msg(), "Account Filter must be a non-zero 11 digit number", "step 3");
+    assert_eq!(t.msg(), "Account Filter must  be a non-zero 11 digit number", "step 3");
 }
 
 #[test]
@@ -447,7 +451,7 @@ fn tc_cdv_01() {
     let mut t = card_list(&r);
     t.typ("CRDSEL1", "S").enter();
     assert_eq!(t.map(), "CCRDSLA", "step 1");
-    assert_eq!(t.field("INFOMSG"), " Displaying requested details", "step 1");
+    assert_eq!(t.field("INFOMSG"), "   Displaying requested details", "step 1");
     assert_ne!(t.field("CRDNAME"), "", "step 1: embossed name");
     assert!(t.s.screen.field("CARDSID").is_some_and(|f| f.attr.protected), "step 1: search fields protected");
     t.key(Aid::Pf(3));
@@ -461,7 +465,7 @@ fn tc_cdv_02() {
     t.typ("OPTION", "4").enter();
     assert_eq!(t.field("INFOMSG"), "Please enter Account and Card Number", "step 1");
     t.enter();
-    assert_eq!(t.msg(), "Account number not provided", "step 2");
+    assert_eq!(t.msg(), "No input received", "step 2");
     assert_eq!((t.field("ACCTSID").as_str(), t.field("CARDSID").as_str()), ("*", "*"), "step 2: both '*'");
     t.typ("ACCTSID", "00000000001").typ("CARDSID", "1234").enter();
     assert_eq!(t.msg(), "CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER", "step 3");

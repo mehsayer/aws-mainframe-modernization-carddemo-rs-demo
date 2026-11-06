@@ -25,7 +25,7 @@ fn card_list_view_update() {
     t.typ("CRDSEL2", "").typ("CRDSEL1", "S").enter();
     assert_eq!(t.map(), "CCRDSLA");
     println!("{}", t.dump());
-    assert_eq!(t.field("INFOMSG"), " Displaying requested details");
+    assert_eq!(t.field("INFOMSG"), "   Displaying requested details");
     t.key(Aid::Pf(3));
     assert_eq!(t.map(), "CCRDLIA");
     t.typ("CRDSEL1", "U").enter();
@@ -54,7 +54,7 @@ fn account_view_and_update() {
     t.typ("OPTION", "1").enter();
     assert_eq!(t.map(), "CACTVWA");
     t.enter();
-    assert_eq!(t.msg(), "Account number not provided");
+    assert_eq!(t.msg(), "No input received");
     t.typ("ACCTSID", "00000000001").enter();
     println!("{}", t.dump());
     assert_eq!(t.field("ACSTTUS"), "Y");

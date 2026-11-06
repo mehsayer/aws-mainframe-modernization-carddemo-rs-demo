@@ -657,6 +657,10 @@ fn sl_edit(st: &mut Sl, c: &mut CarddemoCommarea, map: &Map) {
     } else {
         c.set_cdemo_card_num(&st.cc_card);
     }
+    // cross-field edit: both filters blank -> NO-SEARCH-CRITERIA-RECEIVED
+    if st.acct == Flg::Blank && st.card == Flg::Blank {
+        st.msg = "No input received".into();
+    }
 }
 
 fn sl_read(t: &mut Task, st: &mut Sl) {
@@ -697,7 +701,7 @@ fn sl_send(t: &mut Task, st: &mut Sl, c: &mut CarddemoCommarea, map: &mut Map) {
             map.set("CARDSID", &st.cc_card);
         }
         if let Some(card) = &st.found {
-            info = " Displaying requested details".into();
+            info = "   Displaying requested details".into(); // 88 FOUND-CARDS-FOR-ACCOUNT: three spaces
             map.set("CRDNAME", card.card_embossed_name());
             let exp = card.card_expiraion_date();
             map.set("EXPMON", &exp[5..7]);
@@ -941,6 +945,10 @@ fn upd_receive(t: &mut Task, s: &mut Upd, c: &mut CarddemoCommarea, map: &mut Ma
         } else {
             c.set_cdemo_card_num(&s.cc_card);
             s.card = Flg::Valid;
+        }
+        // cross-field edit: both filters blank -> NO-SEARCH-CRITERIA-RECEIVED
+        if s.acct == Flg::Blank && s.card == Flg::Blank {
+            s.msg = "No input received".into();
         }
         for f in [D_NAME, D_YEAR, D_MON, D_DAY, D_STS] {
             s.fill_d(O_NEW, f, 0);

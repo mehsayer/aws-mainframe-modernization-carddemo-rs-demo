@@ -112,10 +112,14 @@ pub fn coactvwc(t: &mut Task) -> Cr {
             c.set_cdemo_acct_id_n(Dec::ZERO);
         } else if !is_numeric(&cc_acct, false) || cc_acct.iter().all(|&b| b == b'0') {
             flg = Flg::NotOk;
-            msg = "Account Filter must be a non-zero 11 digit number".into();
+            msg = "Account Filter must  be a non-zero 11 digit number".into(); // two spaces, as in COACTVWC
             c.set_cdemo_acct_id_n(Dec::ZERO);
         } else {
             c.set_cdemo_acct_id(&cc_acct);
+        }
+        // 2200: IF FLG-ACCTFILTER-BLANK SET NO-SEARCH-CRITERIA-RECEIVED (overwrites the prompt)
+        if flg == Flg::Blank {
+            msg = "No input received".into();
         }
         if flg == Flg::Valid {
             let f = fetch(t, &mut c, &cc_acct);
@@ -430,6 +434,10 @@ fn acu_receive(t: &mut Task, s: &mut Acu, c: &mut CarddemoCommarea, map: &mut Ma
         } else {
             c.set_cdemo_acct_id(&s.cc_acct);
             s.acct_flg = Flg::Valid;
+        }
+        // IF FLG-ACCTFILTER-BLANK SET NO-SEARCH-CRITERIA-RECEIVED (overwrites the prompt)
+        if s.acct_flg == Flg::Blank {
+            s.msg = "No input received".into();
         }
         return;
     }
