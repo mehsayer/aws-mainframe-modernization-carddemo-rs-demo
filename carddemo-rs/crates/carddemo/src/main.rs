@@ -57,6 +57,8 @@ enum Cmd {
         #[arg(long, default_value = "CC00")]
         tran: String,
     },
+    /// Unload every KSDS to DIR/<DATASET>.dat (fixed-length ASCII records, key order) — IDCAMS REPRO OUTFILE
+    Unload { dir: PathBuf },
     /// Print the current screen of a scripted session (for documentation/screenshots)
     Script {
         /// Steps: `type:FIELD=value`, `key:ENTER|PF3|...`
@@ -126,6 +128,15 @@ fn main() -> Result<()> {
                 if rc > 4 {
                     std::process::exit(rc);
                 }
+            }
+        }
+        Cmd::Unload { dir } => {
+            let v = open_store(&cli.home)?;
+            std::fs::create_dir_all(&dir)?;
+            for ds in vsam::CATALOG {
+                let n = batch::repro::repro_out(&v, ds.name, &dir.join(format!("{}.dat", ds.name)), batch::seqfile::Format::Fixed)
+                    .map_err(anyhow::Error::msg)?;
+                println!("{:<10} {n:>5} records", ds.name);
             }
         }
         Cmd::Online { tran } => {

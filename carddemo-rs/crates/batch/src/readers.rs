@@ -29,14 +29,18 @@ pub fn cbact02c(ctx: &mut StepCtx) -> StepResult {
 pub fn cbact03c(ctx: &mut StepCtx) -> StepResult {
     dump(ctx, "CBACT03C", "XREFFILE", CardXrefRecord::LEN, true)
 }
-/// CBCUS01C — print customer file
+/// CBCUS01C — print customer file (each record is displayed twice: in 1000-CUSTFILE-GET-NEXT and
+/// again in the main loop)
 pub fn cbcus01c(ctx: &mut StepCtx) -> StepResult {
-    dump(ctx, "CBCUS01C", "CUSTFILE", CustomerRecord::LEN, false)
+    dump(ctx, "CBCUS01C", "CUSTFILE", CustomerRecord::LEN, true)
 }
 
 /// COBDATFT (assembler date conversion). Returns (output date 20, error message).
+///
+/// The assembler stores only the converted bytes; the rest of CODATECN-0UT-DATE keeps its
+/// WORKING-STORAGE contents, binary zeros (no VALUE clause), which CBACT01C then copies.
 pub fn cobdatft(in_type: u8, out_type: u8, input: &[u8]) -> ([u8; 20], &'static str) {
-    let mut out = [b' '; 20];
+    let mut out = [0u8; 20];
     match in_type {
         b'1' if input[4] != b'-' && out_type != b'2' => {
             out[..4].copy_from_slice(&input[..4]);
@@ -136,6 +140,8 @@ pub fn cbact01c(ctx: &mut StepCtx) -> StepResult {
             rec.extend_from_slice(v);
             vb.write(&rec).map_err(|_| abend(ctx, "ACCOUNT FILE WRITE STATUS IS:30", "30"))?;
         }
+        // main loop: DISPLAY ACCOUNT-RECORD after 1000-ACCTFILE-GET-NEXT returns
+        ctx.display(text::s(&r));
     }
     for o in [out, arr, vb] {
         o.close().map_err(|_| abend(ctx, "ERROR CLOSING FILE", "30"))?;

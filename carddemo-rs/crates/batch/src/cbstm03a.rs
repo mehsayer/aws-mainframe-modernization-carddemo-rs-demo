@@ -201,9 +201,10 @@ pub fn run(ctx: &mut StepCtx) -> StepResult {
         // 5200-WRITE-HTML-NMADBS
         let mut l23 = [b' '; 50];
         text::mv(&mut l23, &st_name);
-        out.h(&st(100, &[b"<p style=\"font-size:16px\">", w(&l23), b" ", b"</p>"]))?;
+        // DELIMITED BY '  ' (two spaces), then the literal '  '
+        out.h(&st(100, &[b"<p style=\"font-size:16px\">", text::until(&l23, b"  "), b"  ", b"</p>"]))?;
         for a in [&st_add1[..], &st_add2[..], &st_add3[..]] {
-            out.h(&st(100, &[b"<p>", w(a), b" ", b"</p>"]))?;
+            out.h(&st(100, &[b"<p>", text::until(a, b"  "), b"  ", b"</p>"]))?;
         }
         for l in ["</td>", "</tr>", "<tr>", L30_42, "<p style=\"font-size:16px\">Basic Details</p>", "</td>", "</tr>", "<tr>", L22_35] {
             out.h(l.as_bytes())?;

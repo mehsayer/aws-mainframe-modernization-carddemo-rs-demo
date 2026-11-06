@@ -30,7 +30,9 @@ pub fn run(ctx: &mut StepCtx) -> StepResult {
     let mut acct = AccountRecord::new();
     let mut xref = CardXrefRecord::new();
     let mut dis = DisGroupRecord::new();
-    let mut tran = TranRecord::new();
+    // WORKING-STORAGE TRAN-RECORD has no VALUE: binary zeros; STRING ... INTO TRAN-DESC and the FILLER
+    // never overwrite the tail, so the zeros reach SYSTRAN
+    let mut tran = TranRecord::from_bytes(&[0u8; TranRecord::LEN]);
     let int_pic = Pic::display(11, 2, true);
 
     while let Some(raw) = tcatbal.read() {

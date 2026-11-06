@@ -115,24 +115,26 @@ def main():
                 w.append(f"        field::set_n(&mut r.buf[{off}..{off + ln}], Pic {{ digits: {f['digits']}, scale: {f['scale']}, signed: {str(bool(f['signed'])).lower()}, usage: Usage::{usage} }}, \"{num}\".parse().unwrap());")
         w.append("        r")
         w.append("    }")
-        # INITIALIZE: numeric elementary items to zero (fillers untouched -> spaces)
-        w.append("    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.")
+        # INITIALIZE (IBM semantics): elementary items get spaces (alphanumeric) or zero (numeric);
+        # FILLER items and items under a REDEFINES are left untouched.
+        w.append("    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;")
+        w.append("    /// FILLER and REDEFINES items keep their contents.")
         w.append("    pub fn initialize(&mut self) {")
-        w.append("        self.buf.fill(b' ');")
         stack = []
+        redef = []  # depths of REDEFINES groups we are inside
         for f in fields:
             while stack and stack[-1][0] >= f["depth"]:
                 stack.pop()
+            while redef and redef[-1] >= f["depth"]:
+                redef.pop()
             occ = [(s, c) for _, s, c in stack]
             if f["occurs"] > 1:
                 occ.append((f["len"], f["occurs"]))
                 stack.append((f["depth"], f["len"], f["occurs"]))
-            if f["kind"] != "9" or f["redefines"] or f["name"] == "FILLER":
+            if f["redefines"]:
+                redef.append(f["depth"])
+            if redef or f["group"] or f["name"] == "FILLER":
                 continue
-            if any(p.get("redefines") for p in []):
-                continue
-            usage = {"COMP-3": "Comp3", "COMP": "Binary", "BINARY": "Binary"}.get(f["usage"], "Display")
-            pic = f"Pic {{ digits: {f['digits']}, scale: {f['scale']}, signed: {str(bool(f['signed'])).lower()}, usage: Usage::{usage} }}"
             loops = ""
             close = ""
             off = str(f["offset"])
@@ -140,6 +142,11 @@ def main():
                 loops += f"for i{k} in 1..={c} {{ "
                 close += " }"
                 off += f" + (i{k} - 1) * {s}"
+            if f["kind"] != "9":
+                w.append(f"        {loops}self.buf[{off}..{off} + {f['len']}].fill(b' ');{close}")
+                continue
+            usage = {"COMP-3": "Comp3", "COMP": "Binary", "BINARY": "Binary"}.get(f["usage"], "Display")
+            pic = f"Pic {{ digits: {f['digits']}, scale: {f['scale']}, signed: {str(bool(f['signed'])).lower()}, usage: Usage::{usage} }}"
             w.append(f"        {loops}field::set_n(&mut self.buf[{off}..{off} + {f['len']}], {pic}, Dec::ZERO);{close}")
         w.append("    }")
         w.append(f"    pub fn from_bytes(b: &[u8]) -> Self {{ let mut r = Self {{ buf: [b' '; {L}] }}; crate::text::mv(&mut r.buf, b); r }}")

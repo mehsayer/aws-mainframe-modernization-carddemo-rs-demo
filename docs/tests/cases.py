@@ -209,14 +209,18 @@ CASES = [
   ("Check the totals.", "The last transaction's amount is counted twice in the final page total (KD-02); there is no final account total (KD-03)."),
 ]),
 ("TC-BAT-05", "File print utilities", "FR-BAT-RDR-01..03, FR-BAT-VER-01..02", R, [
-  ("`carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`.", "Record dumps as described; READXREF prints each record twice; DALYVRFY reports unverifiable cards."),
+  ("`carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`.", "Record dumps as described; READXREF and READCUST print each record twice; DALYVRFY reports unverifiable cards."),
 ]),
 ("TC-BAT-06", "Export / import round trip", "FR-BAT-XPRT-01..05, KD-09", R, [
   ("`carddemo job CBEXPORT`.", "`CBEXPORT: Total Records Exported:` = customers + accounts + xrefs + transactions + cards."),
-  ("`carddemo job CBIMPORT`.", "`Unknown Record Types: 000000000`; the *.IMPORT data sets equal the master files byte for byte."),
+  ("`carddemo job CBIMPORT`.", "`Errors Written: 000000000`, `Unknown Record Types: 000000000`; the *.IMPORT data sets equal the master files in every named field (FILLER bytes are X'00')."),
 ]),
 ("TC-BAT-07", "Reload jobs and reset", "FR-BAT-UTIL-03, NFR-08", R, [
   ("`carddemo job ACCTFILE` (and the other reload jobs).", "The cluster is reloaded from the sample data."),
   ("`time carddemo reset`.", "Completes in well under a second."),
+]),
+("TC-BAT-08", "Differential test against the original COBOL", "NFR-01, NFR-13, NFR-14, KD-12", "GnuCOBOL 3.x installed; `cargo build --release`", [
+  ("In `carddemo-rs`: `python3 difftest/run.py`.", "Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`)."),
+  ("Read the result table.", "Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0."),
 ]),
 ]

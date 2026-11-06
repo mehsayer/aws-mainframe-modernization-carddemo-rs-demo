@@ -25,10 +25,41 @@ fn full_batch_cycle() {
     let stmt = std::fs::read_to_string(env.ds("STATEMNT.PS")).unwrap();
     println!("{}", stmt.lines().take(24).collect::<Vec<_>>().join("\n"));
     assert!(stmt.contains("END OF STATEMENT"));
-    // export -> import round trip reproduces the master files
-    for (imp, ds) in [("CUSTDATA.IMPORT", "CUSTDATA"), ("ACCTDATA.IMPORT", "ACCTDATA"), ("CARDXREF.IMPORT", "CARDXREF"), ("TRANSACT.IMPORT", "TRANSACT"), ("CARDDATA.IMPORT", "CARDDATA")] {
+    // export -> import round trip reproduces every named field of the master files; FILLER bytes
+    // come back as X'00' (CBIMPORT INITIALIZEs its FD records, which leaves FILLER alone)
+    use cobol::copybooks::*;
+    fn filler_mask(init: impl Fn(&mut Vec<u8>)) -> Vec<bool> {
+        let mut r = Vec::new();
+        init(&mut r);
+        r.iter().map(|&c| c == 0xFF).collect()
+    }
+    macro_rules! mask {
+        ($t:ty) => {
+            filler_mask(|r| {
+                let mut x = <$t>::from_bytes(&[0xFFu8; <$t>::LEN]);
+                x.initialize();
+                *r = x.buf.to_vec();
+            })
+        };
+    }
+    for (imp, ds, mask) in [
+        ("CUSTDATA.IMPORT", "CUSTDATA", mask!(CustomerRecord)),
+        ("ACCTDATA.IMPORT", "ACCTDATA", mask!(AccountRecord)),
+        ("CARDXREF.IMPORT", "CARDXREF", mask!(CardXrefRecord)),
+        ("TRANSACT.IMPORT", "TRANSACT", mask!(TranRecord)),
+        ("CARDDATA.IMPORT", "CARDDATA", mask!(CardRecord)),
+    ] {
         let a = std::fs::read(env.ds(imp)).unwrap();
-        let b: Vec<u8> = v.unload(ds).unwrap().concat();
-        assert!(a == b, "round trip mismatch for {ds}");
+        let b = v.unload(ds).unwrap();
+        assert_eq!(a.len(), b.len() * mask.len(), "record count for {ds}");
+        for (i, (ra, rb)) in a.chunks(mask.len()).zip(&b).enumerate() {
+            for (j, m) in mask.iter().enumerate() {
+                if *m {
+                    assert_eq!(ra[j], 0, "{ds} record {i}: FILLER byte {j} should be X'00'");
+                } else {
+                    assert_eq!(ra[j], rb[j], "round trip mismatch for {ds} record {i} byte {j}");
+                }
+            }
+        }
     }
 }

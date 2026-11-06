@@ -18,7 +18,9 @@ pub fn cbexport(ctx: &mut StepCtx) -> StepResult {
     let c = current_date();
     let date = format!("{}-{}-{}", &c[0..4], &c[4..6], &c[6..8]);
     let time = format!("{}:{}:{}", &c[8..10], &c[10..12], &c[12..14]);
-    let ts = format!("{date} {time}.00");
+    // STRING ... INTO WS-FORMATTED-TIMESTAMP (X(26), no VALUE): the 4 bytes after the 22 written stay X'00'
+    let mut ts = [0u8; 26];
+    text::string_into(&mut ts, &[date.as_bytes(), b" ", time.as_bytes(), b".00"]);
     let mut out = ctx.output("EXPFILE").map_err(|_| fail(ctx, "ERROR: Cannot open EXPORT-OUTPUT, Status: 35"))?;
     ctx.display(format!("CBEXPORT: Export Date: {date}"));
     ctx.display(format!("CBEXPORT: Export Time: {time}"));
@@ -27,7 +29,7 @@ pub fn cbexport(ctx: &mut StepCtx) -> StepResult {
     let base = |seq: u64, t: u8| {
         let mut e = ExportRecord::new();
         e.set_export_rec_type(&[t]);
-        e.set_export_timestamp(ts.as_bytes());
+        e.set_export_timestamp(&ts);
         e.set_export_sequence_num_n(seq.into());
         e.set_export_branch_id(b"0001");
         e.set_export_region_code(b"NORTH");
@@ -140,12 +142,18 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
         outs.push(ctx.output(dd).map_err(|_| fail(ctx, &format!("ERROR: Cannot open {dd}, Status: 35")))?);
     }
     let mut n = [0u64; 7]; // read, C, A, X, T, D, unknown
+    // FD record areas: binary zeros at OPEN; INITIALIZE before each record leaves the FILLERs alone
+    let mut c = CustomerRecord::from_bytes(&[0u8; CustomerRecord::LEN]);
+    let mut a = AccountRecord::from_bytes(&[0u8; AccountRecord::LEN]);
+    let mut x = CardXrefRecord::from_bytes(&[0u8; CardXrefRecord::LEN]);
+    let mut t = TranRecord::from_bytes(&[0u8; TranRecord::LEN]);
+    let mut d = CardRecord::from_bytes(&[0u8; CardRecord::LEN]);
     while let Some(r) = inp.read() {
         n[0] += 1;
         let e = ExportRecord::from_bytes(&r);
         match e.export_rec_type() {
             b"C" => {
-                let mut c = CustomerRecord::new();
+                c.initialize();
                 c.set_cust_id_n(e.exp_cust_id_n());
                 c.set_cust_first_name(e.exp_cust_first_name());
                 c.set_cust_middle_name(e.exp_cust_middle_name());
@@ -168,7 +176,7 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
                 n[1] += 1;
             }
             b"A" => {
-                let mut a = AccountRecord::new();
+                a.initialize();
                 a.set_acct_id_n(e.exp_acct_id_n());
                 a.set_acct_active_status(e.exp_acct_active_status());
                 a.set_acct_curr_bal_n(e.exp_acct_curr_bal_n());
@@ -185,7 +193,7 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
                 n[2] += 1;
             }
             b"X" => {
-                let mut x = CardXrefRecord::new();
+                x.initialize();
                 x.set_xref_card_num(e.exp_xref_card_num());
                 x.set_xref_cust_id_n(e.exp_xref_cust_id_n());
                 x.set_xref_acct_id_n(e.exp_xref_acct_id_n());
@@ -193,7 +201,7 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
                 n[3] += 1;
             }
             b"T" => {
-                let mut t = TranRecord::new();
+                t.initialize();
                 t.set_tran_id(e.exp_tran_id());
                 t.set_tran_type_cd(e.exp_tran_type_cd());
                 t.set_tran_cat_cd_n(e.exp_tran_cat_cd_n());
@@ -211,7 +219,7 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
                 n[4] += 1;
             }
             b"D" => {
-                let mut d = CardRecord::new();
+                d.initialize();
                 d.set_card_num(e.exp_card_num());
                 d.set_card_acct_id_n(e.exp_card_acct_id_n());
                 d.set_card_cvv_cd_n(e.exp_card_cvv_cd_n());
@@ -237,7 +245,9 @@ pub fn cbimport(ctx: &mut StepCtx) -> StepResult {
     ctx.display("CBIMPORT: Import validation completed");
     ctx.display("CBIMPORT: No validation errors detected");
     ctx.display("CBIMPORT: Import completed");
-    for (l, v) in ["Total Records Read: ", "Customers Imported: ", "Accounts Imported: ", "XRefs Imported: ", "Transactions Imported: ", "Cards Imported: ", "Unknown Record Types: "].iter().zip(n) {
+    // WS-ERROR-RECORDS-WRITTEN: one error record per unknown record type (2700 -> 2750)
+    let shown = [n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[6]];
+    for (l, v) in ["Total Records Read: ", "Customers Imported: ", "Accounts Imported: ", "XRefs Imported: ", "Transactions Imported: ", "Cards Imported: ", "Errors Written: ", "Unknown Record Types: "].iter().zip(shown) {
         ctx.display(format!("CBIMPORT: {l}{v:09}"));
     }
     Ok(0)

@@ -18,3 +18,20 @@ cargo test --workspace
 ```
 
 See `../docs/DEMO.md` for the demo script, `../docs/requirements.pdf` for the specification, and `../docs/progress-log.md` for the project log.
+
+## Differential test against the original COBOL
+
+`difftest/run.py` compiles the original batch programs (`app/cbl`) with GnuCOBOL 3.x and runs them on
+the same input data as the Rust port, then compares every output data set, report, return code and
+SYSOUT line:
+
+```sh
+cargo build --release
+python3 difftest/run.py          # report: difftest/out/report.md (copy in docs/difftest/report.md)
+```
+
+Covered: CBACT01C (with COBDATFT translated from the assembler), CBACT02C, CBACT03C, CBCUS01C,
+CBTRN01C, CBTRN02C (POSTTRAN), CBACT04C (INTCALC), CBTRN03C (TRANREPT), CBSTM03A/B (CREASTMT), and
+CBEXPORT/CBIMPORT (FD patched for KD-12). The harness generates small COBOL load/unload programs for the
+indexed files, a C stub for CEE3ABD, and a PARM wrapper for CBACT04C; CBSTM03A's z/OS control-block walk
+(PSA/TCB/TIOT) is commented out. Platform differences that are normalised are listed in the script.

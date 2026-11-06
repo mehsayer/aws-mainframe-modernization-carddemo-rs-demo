@@ -110,9 +110,9 @@ key and key length, and receives a 2-character return code and the record data.
 
 | ID | Requirement |
 |-----|------------------------------|
-| FR-BAT-RDR-01 | CBACT02C, CBACT03C and CBCUS01C read the card, XREF and customer KSDS sequentially and DISPLAY each record (CBACT03C displays each XREF record twice). |
-| FR-BAT-RDR-02 | CBACT01C reads accounts sequentially and, for each one, displays the labelled fields (`ACCT-ID :` … `ACCT-GROUP-ID :`, then a dashed line). It writes three outputs: |
-| | (a) OUTFILE: id, status, balance, limits, dates; reissue date converted from `YYYY-MM-DD` to `YYYYMMDD` by COBDATFT; cycle credit; cycle debit as COMP-3, set to `2525.00` when the account's debit is zero and otherwise left unchanged from the previous record (KD-05); group id. |
+| FR-BAT-RDR-01 | CBACT02C, CBACT03C and CBCUS01C read the card, XREF and customer KSDS sequentially and DISPLAY each record. CBACT03C and CBCUS01C display each record twice (once in the read paragraph, once in the main loop). |
+| FR-BAT-RDR-02 | CBACT01C reads accounts sequentially and, for each one, displays the labelled fields (`ACCT-ID :` … `ACCT-GROUP-ID :`, then a dashed line), then the VBRC records, and finally the whole account record (main-loop DISPLAY). It writes three outputs: |
+| | (a) OUTFILE: id, status, balance, limits, dates; reissue date converted from `YYYY-MM-DD` to `YYYYMMDD` by COBDATFT (the 10-byte field ends in two X'00' bytes: COBDATFT stores 8 bytes into a WORKING-STORAGE area without VALUE); cycle credit; cycle debit as COMP-3, set to `2525.00` when the account's debit is zero and otherwise left unchanged from the previous record (KD-05); group id. |
 | | (b) ARRYFILE: id + 5 × (balance, COMP-3 debit). Slot 1 = (bal, 1005.00), slot 2 = (bal, 1525.00), slot 3 = (−1025.00, −2500.00), slots 4–5 = zero. |
 | | (c) VBRCFILE (variable-length records): a 12-byte record (id + status) and a 39-byte record (id + balance + limit + reissue year). |
 | FR-BAT-RDR-03 | COBDATFT (assembler): type 1 input `YYYYMMDD` → output `YYYY-MM-DD` (output type must be 1); type 2 input `YYYY-MM-DD` → output `YYYYMMDD` (output type must be 2). Anything else sets the error message `INVALID INPUT`. |
@@ -128,11 +128,11 @@ key and key length, and receives a 2-character return code and the record data.
 
 | ID | Requirement |
 |-----|------------------------------|
-| FR-BAT-XPRT-01 | CBEXPORT reads customers, accounts, XREF, transactions and cards in that order. For each record it writes one 500-byte EXPORT-RECORD (CVEXPORT) with type `C`/`A`/`X`/`T`/`D`, timestamp `YYYY-MM-DD HH:MM:SS.00`, binary sequence number, branch `0001`, region `NORTH`, and the record body in the mixed COMP / COMP-3 / zoned layout of CVEXPORT. |
+| FR-BAT-XPRT-01 | CBEXPORT reads customers, accounts, XREF, transactions and cards in that order. For each record it writes one 500-byte EXPORT-RECORD (CVEXPORT) with type `C`/`A`/`X`/`T`/`D`, timestamp `YYYY-MM-DD HH:MM:SS.00` followed by 4 bytes X'00' (STRING into a 26-byte field without VALUE), binary sequence number, branch `0001`, region `NORTH`, and the record body in the mixed COMP / COMP-3 / zoned layout of CVEXPORT. |
 | FR-BAT-XPRT-02 | It displays per-type counts and the total at the end. |
 | FR-BAT-XPRT-03 | CBIMPORT reads the export file and splits it by record type back into customer, account, XREF, transaction and card files. An unknown type is written to ERROUT as `timestamp|type|seq|Unknown record type encountered`. |
 | FR-BAT-XPRT-05 | *Deviation:* the EXPORT.DATA KSDS (`KEYS(4 28)` over a binary sequence number) is a fixed-length sequential file in write order. CBIMPORT reads it in the same order. |
-| FR-BAT-XPRT-04 | It displays the import statistics. Validation (`3000-VALIDATE-IMPORT`) only displays a completion message. |
+| FR-BAT-XPRT-04 | It displays the import statistics (read, per-type counts, errors written, unknown types). Output records are INITIALIZEd field by field, so their FILLER bytes are X'00': an export/import round trip reproduces every named field, not the FILLER bytes. Validation (`3000-VALIDATE-IMPORT`) only displays a completion message. |
 
 ## FR-BAT-UTIL — Utilities
 
@@ -152,3 +152,6 @@ key and key length, and receives a 2-character return code and the record data.
 | KD-04 | CBSTM03A | Fixed in-memory limits of 51 cards × 10 transactions, with no bounds check. |
 | KD-09 | CBIMPORT JCL | The JCL has no CARDOUT DD although the program opens CARD-OUTPUT. The Rust job supplies it. |
 | KD-05 | CBACT01C | The OUTFILE cycle-debit value carries over from the previous record when the account's debit is non-zero. |
+| KD-12 | CBEXPORT, CBIMPORT | The export file's `RECORD KEY IS EXPORT-SEQUENCE-NUM` names a WORKING-STORAGE field (CVEXPORT), not a field of the file's own record. COBOL requires the key inside the record description, so neither program compiles as shipped (verified with GnuCOBOL 3.2). The Rust port implements the evident intent; the differential test compiles both with the key moved into the FD record at the same offset. |
+
+Source note: `CUSTREC.cpy` and `CSLKPCDY.cpy` contain TAB characters. With 8-column tabs the CUSTREC fields run past column 72 and CBSTM03A does not compile; the alignment of the other lines shows that 4-column tabs were intended.

@@ -15,6 +15,11 @@ struct Ws {
     fail_reason_desc: String,
     xref: CardXrefRecord,
     acct: AccountRecord,
+    /// WORKING-STORAGE TRAN-RECORD / TRAN-CAT-BAL-RECORD: no VALUE clause, so they start as
+    /// binary zeros and keep their contents between records. Their FILLERs are never set
+    /// (INITIALIZE skips FILLER), which the output records show.
+    tran: TranRecord,
+    tcat: TranCatBalRecord,
 }
 
 pub fn run(ctx: &mut StepCtx) -> StepResult {
@@ -34,6 +39,8 @@ pub fn run(ctx: &mut StepCtx) -> StepResult {
         fail_reason_desc: String::new(),
         xref: CardXrefRecord::new(),
         acct: AccountRecord::new(),
+        tran: TranRecord::from_bytes(&[0u8; TranRecord::LEN]),
+        tcat: TranCatBalRecord::from_bytes(&[0u8; TranCatBalRecord::LEN]),
     };
 
     // PERFORM UNTIL END-OF-FILE = 'Y'
@@ -111,7 +118,7 @@ fn post_transaction(
     acctfile: &str,
     tcatbalf: &str,
 ) -> Result<(), crate::ctx::Abend> {
-    let mut tran = TranRecord::new();
+    let tran = &mut ws.tran;
     tran.set_tran_id(dly.dalytran_id());
     tran.set_tran_type_cd(dly.dalytran_type_cd());
     tran.set_tran_cat_cd(dly.dalytran_cat_cd());
@@ -134,8 +141,9 @@ fn post_transaction(
     match ctx.vsam.read(tcatbalf, &key) {
         Err(vsam::Resp::NotFnd) => {
             ctx.display(format!("TCATBAL record not found for key : {}.. Creating.", text::s(&key)));
-            // 2700-A-CREATE-TCATBAL-REC
-            let mut tc = TranCatBalRecord::new();
+            // 2700-A-CREATE-TCATBAL-REC: INITIALIZE (named items only), MOVE, ADD
+            let tc = &mut ws.tcat;
+            tc.set_tran_cat_bal_n(cobol::Dec::ZERO);
             tc.set_trancat_acct_id(ws.xref.xref_acct_id());
             tc.set_trancat_type_cd(dly.dalytran_type_cd());
             tc.set_trancat_cd(dly.dalytran_cat_cd());
@@ -144,8 +152,9 @@ fn post_transaction(
         }
         Err(e) => return Err(abend(ctx, "ERROR READING TRANSACTION BALANCE FILE", e.file_status())),
         Ok(r) => {
-            // 2700-B-UPDATE-TCATBAL-REC
-            let mut tc = TranCatBalRecord::from_bytes(&r);
+            // 2700-B-UPDATE-TCATBAL-REC (READ ... INTO TRAN-CAT-BAL-RECORD)
+            ws.tcat = TranCatBalRecord::from_bytes(&r);
+            let tc = &mut ws.tcat;
             tc.set_tran_cat_bal_n(tc.tran_cat_bal_n() + dly.dalytran_amt_n());
             ctx.vsam.rewrite(tcatbalf, &tc.buf).map_err(|e| abend(ctx, "ERROR REWRITING TRANSACTION BALANCE FILE", e.file_status()))?;
         }
@@ -165,6 +174,6 @@ fn post_transaction(
     }
 
     // 2900-WRITE-TRANSACTION-FILE
-    ctx.vsam.write(tranfile, &tran.buf).map_err(|e| abend(ctx, "ERROR WRITING TO TRANSACTION FILE", e.file_status()))?;
+    ctx.vsam.write(tranfile, &ws.tran.buf).map_err(|e| abend(ctx, "ERROR WRITING TO TRANSACTION FILE", e.file_status()))?;
     Ok(())
 }

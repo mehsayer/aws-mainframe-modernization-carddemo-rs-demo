@@ -28,9 +28,15 @@ impl SecUserData {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 8].fill(b' ');
+        self.buf[8..8 + 20].fill(b' ');
+        self.buf[28..28 + 20].fill(b' ');
+        self.buf[48..48 + 8].fill(b' ');
+        self.buf[56..56 + 1].fill(b' ');
+        self.buf[57..57 + 23].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 80] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -90,15 +96,21 @@ impl AccountRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
         field::set_n(&mut self.buf[0..0 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[11..11 + 1].fill(b' ');
         field::set_n(&mut self.buf[12..12 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[24..24 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[36..36 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
+        self.buf[48..48 + 10].fill(b' ');
+        self.buf[58..58 + 10].fill(b' ');
+        self.buf[68..68 + 10].fill(b' ');
         field::set_n(&mut self.buf[78..78 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[90..90 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
+        self.buf[102..102 + 10].fill(b' ');
+        self.buf[112..112 + 10].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 300] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -134,11 +146,15 @@ impl CardRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
         field::set_n(&mut self.buf[16..16 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[27..27 + 3], Pic { digits: 3, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[30..30 + 50].fill(b' ');
+        self.buf[80..80 + 10].fill(b' ');
+        self.buf[90..90 + 1].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 150] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -168,9 +184,10 @@ impl CardXrefRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
         field::set_n(&mut self.buf[16..16 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[25..25 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
     }
@@ -235,11 +252,26 @@ impl CustomerRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
         field::set_n(&mut self.buf[0..0 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[9..9 + 25].fill(b' ');
+        self.buf[34..34 + 25].fill(b' ');
+        self.buf[59..59 + 25].fill(b' ');
+        self.buf[84..84 + 50].fill(b' ');
+        self.buf[134..134 + 50].fill(b' ');
+        self.buf[184..184 + 50].fill(b' ');
+        self.buf[234..234 + 2].fill(b' ');
+        self.buf[236..236 + 3].fill(b' ');
+        self.buf[239..239 + 10].fill(b' ');
+        self.buf[249..249 + 15].fill(b' ');
+        self.buf[264..264 + 15].fill(b' ');
         field::set_n(&mut self.buf[279..279 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[288..288 + 20].fill(b' ');
+        self.buf[308..308 + 10].fill(b' ');
+        self.buf[318..318 + 10].fill(b' ');
+        self.buf[328..328 + 1].fill(b' ');
         field::set_n(&mut self.buf[329..329 + 3], Pic { digits: 3, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 500] }; crate::text::mv(&mut r.buf, b); r }
@@ -277,10 +309,11 @@ impl TranCatBalRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
         field::set_n(&mut self.buf[0..0 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[11..11 + 2].fill(b' ');
         field::set_n(&mut self.buf[13..13 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[17..17 + 11], Pic { digits: 11, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
     }
@@ -316,9 +349,11 @@ impl DisGroupRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 10].fill(b' ');
+        self.buf[10..10 + 2].fill(b' ');
         field::set_n(&mut self.buf[12..12 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[16..16 + 6], Pic { digits: 6, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
     }
@@ -342,9 +377,11 @@ impl TranTypeRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 2].fill(b' ');
+        self.buf[2..2 + 50].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 60] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -373,10 +410,12 @@ impl TranCatRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 2].fill(b' ');
         field::set_n(&mut self.buf[2..2 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[6..6 + 50].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 60] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -429,12 +468,22 @@ impl TranRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
+        self.buf[16..16 + 2].fill(b' ');
         field::set_n(&mut self.buf[18..18 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[22..22 + 10].fill(b' ');
+        self.buf[32..32 + 100].fill(b' ');
         field::set_n(&mut self.buf[132..132 + 11], Pic { digits: 11, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[143..143 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[152..152 + 50].fill(b' ');
+        self.buf[202..202 + 50].fill(b' ');
+        self.buf[252..252 + 10].fill(b' ');
+        self.buf[262..262 + 16].fill(b' ');
+        self.buf[278..278 + 26].fill(b' ');
+        self.buf[304..304 + 26].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 350] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -487,12 +536,22 @@ impl DalytranRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
+        self.buf[16..16 + 2].fill(b' ');
         field::set_n(&mut self.buf[18..18 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[22..22 + 10].fill(b' ');
+        self.buf[32..32 + 100].fill(b' ');
         field::set_n(&mut self.buf[132..132 + 11], Pic { digits: 11, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[143..143 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[152..152 + 50].fill(b' ');
+        self.buf[202..202 + 50].fill(b' ');
+        self.buf[252..252 + 10].fill(b' ');
+        self.buf[262..262 + 16].fill(b' ');
+        self.buf[278..278 + 26].fill(b' ');
+        self.buf[304..304 + 26].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 350] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -526,9 +585,14 @@ impl ReportNameHeader {
         r.buf[105..115].copy_from_slice(b"          ");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 38].fill(b' ');
+        self.buf[38..38 + 41].fill(b' ');
+        self.buf[79..79 + 12].fill(b' ');
+        self.buf[91..91 + 10].fill(b' ');
+        self.buf[105..105 + 10].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 115] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -574,10 +638,17 @@ impl TransactionDetailReport {
         r.buf[112..114].copy_from_slice(b"  ");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
+        self.buf[17..17 + 11].fill(b' ');
+        self.buf[29..29 + 2].fill(b' ');
+        self.buf[32..32 + 15].fill(b' ');
         field::set_n(&mut self.buf[48..48 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[53..53 + 29].fill(b' ');
+        self.buf[83..83 + 10].fill(b' ');
+        self.buf[97..97 + 15].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 114] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -602,9 +673,9 @@ impl TransactionHeader1 {
         r.buf[98..114].copy_from_slice(b"        Amount  ");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 114] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -625,9 +696,10 @@ impl TransactionHeader2 {
         r.buf[0..133].copy_from_slice(b"-------------------------------------------------------------------------------------------------------------------------------------");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 133].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 133] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -650,9 +722,10 @@ impl ReportPageTotals {
         r.buf[11..97].copy_from_slice(b"......................................................................................");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[97..97 + 15].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 112] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -675,9 +748,10 @@ impl ReportAccountTotals {
         r.buf[13..97].copy_from_slice(b"....................................................................................");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[97..97 + 15].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 112] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -700,9 +774,10 @@ impl ReportGrandTotals {
         r.buf[11..97].copy_from_slice(b"......................................................................................");
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[97..97 + 15].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 112] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -759,12 +834,22 @@ impl TrnxRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 16].fill(b' ');
+        self.buf[16..16 + 16].fill(b' ');
+        self.buf[32..32 + 2].fill(b' ');
         field::set_n(&mut self.buf[34..34 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[38..38 + 10].fill(b' ');
+        self.buf[48..48 + 100].fill(b' ');
         field::set_n(&mut self.buf[148..148 + 11], Pic { digits: 11, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[159..159 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[168..168 + 50].fill(b' ');
+        self.buf[218..218 + 50].fill(b' ');
+        self.buf[268..268 + 10].fill(b' ');
+        self.buf[278..278 + 26].fill(b' ');
+        self.buf[304..304 + 26].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 350] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -965,26 +1050,15 @@ impl ExportRecord {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 1].fill(b' ');
+        self.buf[1..1 + 26].fill(b' ');
         field::set_n(&mut self.buf[27..27 + 4], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[40..40 + 4], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[314..314 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[364..364 + 2], Pic { digits: 3, scale: 0, signed: false, usage: Usage::Comp3 }, Dec::ZERO);
-        field::set_n(&mut self.buf[40..40 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[52..52 + 7], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Comp3 }, Dec::ZERO);
-        field::set_n(&mut self.buf[59..59 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[71..71 + 7], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Comp3 }, Dec::ZERO);
-        field::set_n(&mut self.buf[108..108 + 12], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[120..120 + 8], Pic { digits: 12, scale: 2, signed: true, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[58..58 + 4], Pic { digits: 4, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[172..172 + 6], Pic { digits: 11, scale: 2, signed: true, usage: Usage::Comp3 }, Dec::ZERO);
-        field::set_n(&mut self.buf[178..178 + 4], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[56..56 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
-        field::set_n(&mut self.buf[65..65 + 8], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[56..56 + 8], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
-        field::set_n(&mut self.buf[64..64 + 2], Pic { digits: 3, scale: 0, signed: false, usage: Usage::Binary }, Dec::ZERO);
+        self.buf[31..31 + 4].fill(b' ');
+        self.buf[35..35 + 5].fill(b' ');
+        self.buf[40..40 + 460].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 500] }; crate::text::mv(&mut r.buf, b); r }
 }
@@ -1056,13 +1130,25 @@ impl CarddemoCommarea {
         r.initialize();
         r
     }
-    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero.
+    /// COBOL INITIALIZE: alphanumeric items to spaces, numeric items to zero;
+    /// FILLER and REDEFINES items keep their contents.
     pub fn initialize(&mut self) {
-        self.buf.fill(b' ');
+        self.buf[0..0 + 4].fill(b' ');
+        self.buf[4..4 + 8].fill(b' ');
+        self.buf[12..12 + 4].fill(b' ');
+        self.buf[16..16 + 8].fill(b' ');
+        self.buf[24..24 + 8].fill(b' ');
+        self.buf[32..32 + 1].fill(b' ');
         field::set_n(&mut self.buf[33..33 + 1], Pic { digits: 1, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
         field::set_n(&mut self.buf[34..34 + 9], Pic { digits: 9, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[43..43 + 25].fill(b' ');
+        self.buf[68..68 + 25].fill(b' ');
+        self.buf[93..93 + 25].fill(b' ');
         field::set_n(&mut self.buf[118..118 + 11], Pic { digits: 11, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[129..129 + 1].fill(b' ');
         field::set_n(&mut self.buf[130..130 + 16], Pic { digits: 16, scale: 0, signed: false, usage: Usage::Display }, Dec::ZERO);
+        self.buf[146..146 + 7].fill(b' ');
+        self.buf[153..153 + 7].fill(b' ');
     }
     pub fn from_bytes(b: &[u8]) -> Self { let mut r = Self { buf: [b' '; 160] }; crate::text::mv(&mut r.buf, b); r }
 }
