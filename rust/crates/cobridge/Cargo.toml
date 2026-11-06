@@ -11,6 +11,7 @@ vsam.workspace = true
 cics.workspace = true
 online.workspace = true
 chrono.workspace = true
+libc = "0.2"
 
 [dev-dependencies]
 batch.workspace = true

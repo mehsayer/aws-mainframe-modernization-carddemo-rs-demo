@@ -23,6 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "rust" / "difftest"))
 import run as h  # noqa: E402  (the differential-test harness: build + COBOL helpers)
+sys.path.insert(0, str(ROOT / "rust" / "cobridge"))
+import cicsprep  # noqa: E402  (the module-directory rule shared with the runtime)
 
 OUT = ROOT / "demo" / "out"
 HLQ = "AWS.M2.CARDDEMO"
@@ -55,16 +57,13 @@ def ensure_rust():
 
 
 def ensure_built():
-    """The batch demo: the Rust binary and the original batch COBOL programs."""
-    ensure_rust()
+    """The batch demo: the Rust binary and the original batch COBOL programs (h.build() also runs the
+    cargo build, so it is run only once)."""
     if not (h.BUILD / "CBSTM03A").exists():
         say("Compiling the original COBOL batch programs (first time only, about a minute) ...")
         h.build()
-
-
-def cobol_modules_dir():
-    """Same rule as the runtime (cobridge::modules_dir) and cicsprep.py."""
-    return Path(os.environ.get("CARDDEMO_COBOL_MODULES") or ROOT / "rust" / "cobridge" / "build" / "modules")
+    else:
+        ensure_rust()
 
 
 # ------------------------------------------------------------------ COBOL
@@ -187,11 +186,12 @@ def compare():
 
 def online(cobol=False):
     ensure_rust()
-    if cobol and not (cobol_modules_dir() / "COSGN00C.so").exists():
+    if cobol and not (cicsprep.modules_dir() / "COSGN00C.so").exists():
         say("Translating and compiling the original COBOL screen programs (first time only) ...")
         subprocess.run([sys.executable, str(ROOT / "rust" / "cobridge" / "cicsprep.py")], check=True)
     # separate data stores, so the two systems can run side by side
-    env = dict(os.environ, CARDDEMO_HOME=str(OUT / ("online-cobol" if cobol else "online")), CARDDEMO_SEED=str(h.SEED))
+    env = dict(os.environ, CARDDEMO_HOME=str(OUT / ("online-cobol" if cobol else "online")), CARDDEMO_SEED=str(h.SEED),
+               CARDDEMO_COBOL_MODULES=str(cicsprep.modules_dir()))
     subprocess.run([str(h.BIN), "reset"], env=env, check=True, capture_output=True)
     which = "the ORIGINAL COBOL programs" if cobol else "the Rust translation"
     print(f"Online screens running {which}.")

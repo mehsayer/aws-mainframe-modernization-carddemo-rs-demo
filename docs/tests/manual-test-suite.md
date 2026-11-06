@@ -579,7 +579,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 # Execution log
 
-Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **42 of 42 passed.**
+Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **41 of 42 passed**; for 1 more the automated part passed and the manual part was not executed (see the notes).
 
 | Test case | Date | Tester | Result | Notes |
 |---|---|---|---|---|

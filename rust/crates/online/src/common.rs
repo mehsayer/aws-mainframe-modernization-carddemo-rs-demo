@@ -12,14 +12,13 @@ pub const CCDA_MSG_INVALID_KEY: &str = "Invalid key pressed. Please see below...
 
 /// Clock (FUNCTION CURRENT-DATE / ASKTIME); `CARDDEMO_NOW` overrides it for tests.
 pub fn now() -> NaiveDateTime {
-    if let Ok(s) = std::env::var("CARDDEMO_NOW") {
-        for f in ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S"] {
-            if let Ok(t) = NaiveDateTime::parse_from_str(&s, f) {
-                return t;
-            }
-        }
-    }
-    chrono::Local::now().naive_local()
+    fixed_now().unwrap_or_else(|| chrono::Local::now().naive_local())
+}
+
+/// The test clock: `CARDDEMO_NOW` when it is set and valid (`YYYY-MM-DDTHH:MM:SS[.ff]`), else None.
+pub fn fixed_now() -> Option<NaiveDateTime> {
+    let s = std::env::var("CARDDEMO_NOW").ok()?;
+    ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S"].iter().find_map(|f| NaiveDateTime::parse_from_str(&s, f).ok())
 }
 
 /// POPULATE-HEADER-INFO

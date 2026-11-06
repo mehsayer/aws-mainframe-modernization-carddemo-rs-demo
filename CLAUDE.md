@@ -20,6 +20,7 @@ cd rust && cargo clippy --workspace --all-targets               # must stay warn
 python3 rust/difftest/run.py          # compile cobol/ with GnuCOBOL, compare all batch outputs with Rust
 python3 rust/cobridge/cicsprep.py     # translate + compile the original online programs for the CICS bridge
 python3 rust/difftest/online.py       # run the online tests on Rust and on the original COBOL, compare screens
+                                      #   (--rust-only without GnuCOBOL; results in difftest/out-online/)
 CARDDEMO_REGION=cobol cargo test --release -p online --tests -- --test-threads=1   # online tests on COBOL
 python3 docs/tests/execute.py         # execute the manual test suite (42 cases) -> docs/tests/results.json
 python3 demo/demo.py all              # demo: COBOL run, Rust run, compare
@@ -53,8 +54,10 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   behaviour there instead of guessing.
 - **CICS gives each task fresh WORKING-STORAGE**; the bridge CANCELs every COBOL program after its task.
   Invalid data moved into numeric fields is compiler-dependent: document it, do not "fix" it.
-- `rust/crates/cobridge` loads GnuCOBOL's libcob at run time (dlopen; `CARDDEMO_LIBCOB` overrides the
-  path), so every build works without GnuCOBOL; only running the COBOL programs needs it. COBOL DISPLAY
+- `rust/crates/cobridge` loads GnuCOBOL's libcob at run time (dlopen; `CARDDEMO_LIBCOB` names the exact
+  library, with no fallback), so every build works without GnuCOBOL; only running the COBOL programs needs
+  it. The module directory rule lives in `cicsprep.modules_dir()` (Python users import it) and
+  `cobridge::modules_dir()`; cicsprep only ever replaces its own module files there. COBOL DISPLAY
   output and libcob messages go to the file given to `cobridge::set_sysout` (the TUI uses
   `<home>/cobol-sysout.log`). `COB_CURRENT_DATE` is set only when `CARDDEMO_NOW` freezes the Rust clock.
 

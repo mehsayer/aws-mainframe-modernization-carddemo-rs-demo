@@ -295,6 +295,7 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
 
     let mut term = ratatui::init();
+    TUI_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
     let res = (|| -> Result<()> {
         loop {
             term.draw(|f| draw(f, &sess, &ui))?;
@@ -326,9 +327,13 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
         }
         Ok(())
     })();
+    TUI_ACTIVE.store(false, std::sync::atomic::Ordering::SeqCst);
     ratatui::restore();
     res
 }
+
+/// True while the full-screen UI is on the terminal (the exit handler restores the terminal only then).
+static TUI_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn aid_of(k: &KeyEvent) -> Option<Aid> {
     let shift = k.modifiers.contains(KeyModifiers::SHIFT);
@@ -465,8 +470,14 @@ fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
     extern "C" {
         fn atexit(f: extern "C" fn()) -> std::ffi::c_int;
     }
+    // libcob may end the process from inside a COBOL call (runtime error, STOP RUN). stdout/stderr are
+    // then still redirected to the sysout file: put them back first, and restore the terminal only if
+    // the UI is still on screen (a normal exit has already restored it).
     extern "C" fn restore_terminal() {
-        ratatui::restore();
+        cobridge::restore_stdio();
+        if TUI_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            ratatui::restore();
+        }
     }
     unsafe { atexit(restore_terminal) };
     Ok(cobridge::region(v))

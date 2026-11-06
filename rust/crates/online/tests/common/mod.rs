@@ -10,6 +10,9 @@ pub fn region() -> Region {
     let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
     batch::repro::reset(&v, &seed).unwrap();
     if cobol_region() {
+        // the COBOL programs' DISPLAY output goes to a file, not into the test harness output
+        let dir = std::env::var_os("CARDDEMO_SCREEN_LOG").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+        cobridge::set_sysout(&dir.join("cobol-sysout.log")).expect("cobol sysout file");
         cobridge::region(v)
     } else {
         online::region(v)

@@ -95,11 +95,12 @@ if os.path.exists(os.path.join(HERE, "results.json")):
     import json
     log = json.load(open(os.path.join(HERE, "results.json")))
     res = log["results"]
-    passed = sum(1 for v in res.values() if v["result"].startswith("Pass"))
+    passed = sum(1 for v in res.values() if v["result"] == "Pass")
+    partial = sum(1 for v in res.values() if v["result"].startswith("Pass ("))
     out.append(f"Executed {log['date']} by {log['tester']}: the online and batch cases run through the same "
                "3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test "
                "per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with "
-               f"`python3 docs/tests/execute.py`. **{passed} of {len(res)} passed.**\n")
+               f"`python3 docs/tests/execute.py`. **{passed} of {len(res)} passed**" + (f"; for {partial} more the automated part passed and the manual part was not executed (see the notes)" if partial else "") + ".\n")
 out.append("| Test case | Date | Tester | Result | Notes |\n|---|---|---|---|---|")
 for c in CASES:
     if log and c[0] in log["results"]:

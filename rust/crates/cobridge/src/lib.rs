@@ -16,20 +16,11 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Mutex, Once, OnceLock};
 use vsam::{Browse, Resp};
 
-extern "C" {
-    fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
-    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
-    fn dup(fd: c_int) -> c_int;
-    fn dup2(from: c_int, to: c_int) -> c_int;
-    fn close(fd: c_int) -> c_int;
-    fn fflush(stream: *mut c_void) -> c_int;
-}
-
-const RTLD_NOW: c_int = 2;
-const RTLD_GLOBAL: c_int = 0x100;
+use libc::{close, dlerror, dlopen, dlsym, dup, dup2, fflush, RTLD_GLOBAL, RTLD_NOW};
 
 /// The GnuCOBOL runtime functions the bridge uses. libcob is loaded at run time (dlopen), so nothing in
 /// the workspace needs GnuCOBOL to build; only running the COBOL programs does.
@@ -47,20 +38,38 @@ struct Cob {
 
 static COB: OnceLock<Result<Cob, String>> = OnceLock::new();
 
-/// libcob: `CARDDEMO_LIBCOB` (a path), else the usual shared-library names.
+fn last_dl_error() -> String {
+    let e = unsafe { dlerror() };
+    if e.is_null() {
+        "unknown error".into()
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(e) }.to_string_lossy().into_owned()
+    }
+}
+
+/// libcob: exactly `CARDDEMO_LIBCOB` when it is set (no fallback: it must match the cobc that built the
+/// modules), else the usual shared-library names. The loader's own message is reported on failure.
 fn load_cob() -> Result<Cob, String> {
-    let mut names: Vec<String> = std::env::var("CARDDEMO_LIBCOB").into_iter().collect();
-    names.extend(["libcob.so.4", "libcob.so", "libcob.dylib"].map(String::from));
+    let explicit = std::env::var("CARDDEMO_LIBCOB").ok().filter(|v| !v.is_empty());
+    let names: Vec<String> = match &explicit {
+        Some(p) => vec![p.clone()],
+        None => ["libcob.so.4", "libcob.so", "libcob.dylib"].map(String::from).to_vec(),
+    };
     let mut handle = std::ptr::null_mut();
+    let mut errors = Vec::new();
     for n in &names {
         let c = CString::new(n.as_str()).map_err(|e| e.to_string())?;
         handle = unsafe { dlopen(c.as_ptr(), RTLD_NOW | RTLD_GLOBAL) };
         if !handle.is_null() {
             break;
         }
+        errors.push(last_dl_error());
     }
     if handle.is_null() {
-        return Err("GnuCOBOL runtime (libcob) not found: install GnuCOBOL 3.x or set CARDDEMO_LIBCOB".into());
+        return Err(match explicit {
+            Some(p) => format!("cannot load CARDDEMO_LIBCOB={p}: {}", errors.join("; ")),
+            None => format!("cannot load the GnuCOBOL runtime (libcob; install GnuCOBOL 3.x or set CARDDEMO_LIBCOB): {}", errors.join("; ")),
+        });
     }
     let sym = |n: &str| -> Result<*mut c_void, String> {
         let c = CString::new(n).unwrap();
@@ -101,10 +110,12 @@ pub fn set_sysout(path: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// The original stdout/stderr while a redirect is active (-1 otherwise), so [`restore_stdio`] can put
+/// them back even when libcob ends the process from inside a program call.
+static SAVED_FDS: [AtomicI32; 2] = [AtomicI32::new(-1), AtomicI32::new(-1)];
+
 /// stdout/stderr redirected to the sysout file for the duration of one program call.
-struct SysoutRedirect {
-    saved: [c_int; 2],
-}
+struct SysoutRedirect;
 
 impl SysoutRedirect {
     fn start() -> Option<SysoutRedirect> {
@@ -113,22 +124,39 @@ impl SysoutRedirect {
         let fd = guard.as_ref()?.as_raw_fd();
         unsafe {
             fflush(std::ptr::null_mut());
-            let saved = [dup(1), dup(2)];
-            if saved.iter().any(|&s| s < 0) {
+            let (out, err) = (dup(1), dup(2));
+            if out < 0 || err < 0 {
+                // close whichever succeeded: no descriptor leak per call
+                for s in [out, err] {
+                    if s >= 0 {
+                        close(s);
+                    }
+                }
                 return None;
             }
+            SAVED_FDS[0].store(out, Ordering::SeqCst);
+            SAVED_FDS[1].store(err, Ordering::SeqCst);
             dup2(fd, 1);
             dup2(fd, 2);
-            Some(SysoutRedirect { saved })
+            Some(SysoutRedirect)
         }
     }
 }
 
 impl Drop for SysoutRedirect {
     fn drop(&mut self) {
-        unsafe {
-            fflush(std::ptr::null_mut());
-            for (target, saved) in [(1, self.saved[0]), (2, self.saved[1])] {
+        restore_stdio();
+    }
+}
+
+/// Put stdout/stderr back if a COBOL call has them redirected. Safe to call at any time, including from
+/// an exit handler while libcob is ending the process.
+pub fn restore_stdio() {
+    unsafe {
+        fflush(std::ptr::null_mut());
+        for (target, slot) in [(1, &SAVED_FDS[0]), (2, &SAVED_FDS[1])] {
+            let saved = slot.swap(-1, Ordering::SeqCst);
+            if saved >= 0 {
                 dup2(saved, target);
                 close(saved);
             }
@@ -150,11 +178,13 @@ const EIB_RESP2: usize = 63;
 const EIB_CDCICS: usize = 67;
 const EIB_LEN: usize = 75;
 
-/// Directory of the compiled COBOL modules (`CARDDEMO_COBOL_MODULES`, default: the build output).
+/// Directory of the compiled COBOL modules: a non-empty `CARDDEMO_COBOL_MODULES` (made absolute against
+/// the current directory), else the build output. Same rule as `modules_dir()` in cobridge/cicsprep.py.
 pub fn modules_dir() -> PathBuf {
-    std::env::var_os("CARDDEMO_COBOL_MODULES")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cobridge/build/modules"))
+    match std::env::var_os("CARDDEMO_COBOL_MODULES").filter(|v| !v.is_empty()) {
+        Some(v) => std::path::absolute(PathBuf::from(v)).unwrap_or_default(),
+        None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cobridge/build/modules"),
+    }
 }
 
 /// True when the COBOL modules have been built (`python3 rust/cobridge/cicsprep.py`).
@@ -180,8 +210,7 @@ fn init() {
         std::env::set_var("COB_LIBRARY_PATH", modules_dir());
         // A fixed test clock (CARDDEMO_NOW) is passed on to FUNCTION CURRENT-DATE. GnuCOBOL treats
         // COB_CURRENT_DATE as a frozen clock, so it is only set when the Rust side is frozen too.
-        if std::env::var_os("CARDDEMO_NOW").is_some() {
-            let now = online::common::now();
+        if let Some(now) = online::common::fixed_now() {
             std::env::set_var("COB_CURRENT_DATE", now.format("%Y/%m/%d %H:%M:%S").to_string());
         }
         if let Err(e) = check() {
@@ -426,7 +455,11 @@ extern "C" fn cdcics() -> c_int {
     let pieces: usize = unsafe { cobol::text::s(param_bytes(2)) }.trim()[1..].parse().unwrap_or(1);
     let desc: String = (0..pieces).map(|i| unsafe { cobol::text::s(param_bytes(3 + i as c_int)) }).collect();
     let cmd = Cmd::parse(&desc, 3 + pieces as c_int);
-    let out = execute(ctx, t, &cmd);
+    // a panic must not unwind into libcob (it would abort the process with the terminal in raw mode)
+    let out = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(ctx, t, &cmd))) {
+        Ok(o) => o,
+        Err(_) => Out::Transfer(Transfer::Abend("ASRA".into())),
+    };
     let (resp, resp2) = match &out {
         Out::Cond(r, r2) => (*r, *r2),
         _ => (0, 0),
@@ -702,4 +735,35 @@ fn receive_map(t: &mut Task, c: &Cmd) -> Out {
         buf[off + 7..off + 7 + f.data.len()].copy_from_slice(&f.data);
     }
     Out::Ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn restore_stdio_undoes_an_active_redirect() {
+        let log = std::env::temp_dir().join(format!("cobridge-unit-{}.log", std::process::id()));
+        let _ = std::fs::remove_file(&log);
+        set_sysout(&log).unwrap();
+        let before = unsafe { libc::fcntl(1, libc::F_GETFD) };
+        let r = SysoutRedirect::start().expect("redirect");
+        unsafe { libc::write(1, b"inside\n".as_ptr().cast(), 7) };
+        restore_stdio(); // what the exit handler does while a call is still running
+        drop(r); // and the normal end of the call afterwards must not break anything
+        assert_eq!(unsafe { libc::fcntl(1, libc::F_GETFD) }, before);
+        assert!(SAVED_FDS.iter().all(|s| s.load(Ordering::SeqCst) == -1));
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), "inside\n");
+        *SYSOUT.lock().unwrap() = None;
+    }
+
+    #[test]
+    fn modules_dir_rule() {
+        // an empty value means "not set", like the Python side
+        std::env::set_var("CARDDEMO_COBOL_MODULES", "");
+        assert!(modules_dir().ends_with("cobridge/build/modules"));
+        std::env::set_var("CARDDEMO_COBOL_MODULES", "rel/mods");
+        assert!(modules_dir().is_absolute() && modules_dir().ends_with("rel/mods"));
+        std::env::remove_var("CARDDEMO_COBOL_MODULES");
+    }
 }

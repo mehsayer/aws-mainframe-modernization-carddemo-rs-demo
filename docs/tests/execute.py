@@ -18,21 +18,28 @@ RS = os.path.join(HERE, "..", "..", "rust")
 sys.path.insert(0, HERE)
 from cases import CASES  # noqa: E402
 
-o = subprocess.run([sys.executable, os.path.join(RS, "difftest", "online.py")], cwd=RS, capture_output=True, text=True)
-online_json = os.path.join(RS, "difftest", "out-online", "results.json")
-online = json.load(open(online_json)) if o.returncode in (0, 1) and os.path.exists(online_json) else None
+ONLINE = os.path.join(RS, "difftest", "online.py")
+RESULTS = os.path.join(RS, "difftest", "out-online", "results.json")
 
-if online and "manual_suite" in online["tests"]:
-    rust_tests = online["tests"]["manual_suite"].get("rust", {})
-    cobol_tests = online["tests"]["manual_suite"].get("cobol", {})
-else:  # no GnuCOBOL: the suite on Rust alone
-    r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", "manual_suite", "--", "--test-threads=1"],
-                       cwd=RS, capture_output=True, text=True)
-    out = r.stdout + r.stderr
-    rust_tests = {m.group(1): {"result": m.group(2), "note": ""} for m in re.finditer(r"^test (tc_\w+) \.\.\. (ok|FAILED)$", out, re.M)}
-    for m in re.finditer(r"thread '(tc_\w+)'.*?panicked at [^\n]*\n([^\n]*)", out, re.S):
-        rust_tests.setdefault(m.group(1), {"result": "FAILED"})["note"] = m.group(2).strip()[:120]
-    cobol_tests = {}
+
+def run_online(*args):
+    """online.py clears its output first, so results.json exists only if this run produced it."""
+    r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
+    if not os.path.exists(RESULTS):
+        sys.stderr.write(f"online.py {' '.join(args)} did not complete:\n{r.stderr[-2000:]}\n")
+        return None
+    return json.load(open(RESULTS))
+
+
+online = run_online()
+if online is None:  # e.g. no GnuCOBOL: the same tests on Rust only (same parser, same results format)
+    rust_run = run_online("--rust-only")
+    if rust_run is None:
+        sys.exit("the scripted test suite could not run")
+    tests = rust_run["tests"].get("manual_suite", {})
+else:
+    tests = online["tests"].get("manual_suite", {})
+rust_tests, cobol_tests = tests.get("rust", {}), tests.get("cobol", {})
 
 d = subprocess.run([sys.executable, os.path.join(RS, "difftest", "run.py")], cwd=RS, capture_output=True, text=True)
 rows = len(re.findall(r"^\| .* \| (identical|\*\*)", d.stdout, re.M))
@@ -65,6 +72,9 @@ for c in CASES:
     res[cid] = {"result": "Pass" if t["result"] == "ok" else "Fail", "notes": note}
 json.dump({"date": today, "tester": "Claude Code (scripted)", "results": res},
           open(os.path.join(HERE, "results.json"), "w"), indent=1)
-n = {k: sum(1 for v in res.values() if v["result"].startswith(k)) for k in ("Pass", "Fail", "Not run")}
+n = {"Pass": sum(1 for v in res.values() if v["result"] == "Pass"),
+     "Pass (partly manual, automated part passed)": sum(1 for v in res.values() if v["result"].startswith("Pass (")),
+     "Fail": sum(1 for v in res.values() if v["result"] == "Fail"),
+     "Not run": sum(1 for v in res.values() if v["result"] == "Not run")}
 print(f"{len(res)} cases: {n}")
 sys.exit(0 if n["Fail"] == 0 and n["Not run"] == 0 else 1)

@@ -26,13 +26,23 @@ BUILD = HERE / "build"
 SRC_OUT, CPY_OUT = BUILD / "src", BUILD / "cpy"
 
 
+DEFAULT_MODULES = BUILD / "modules"
+
+
 def modules_dir():
-    """Where the compiled modules go and where the runtime loads them from (same rule as
-    cobridge::modules_dir): CARDDEMO_COBOL_MODULES, else rust/cobridge/build/modules."""
-    return Path(os.environ.get("CARDDEMO_COBOL_MODULES") or BUILD / "modules")
+    """Where the compiled modules go and where the runtime loads them from. The one rule, also used by
+    demo.py and online.py and mirrored by cobridge::modules_dir: a non-empty CARDDEMO_COBOL_MODULES (made
+    absolute against the current directory), else rust/cobridge/build/modules."""
+    v = os.environ.get("CARDDEMO_COBOL_MODULES", "")
+    return Path(v).resolve() if v else DEFAULT_MODULES
 
 
-MOD_OUT = modules_dir()
+def module_names():
+    """The files this build writes into the module directory (and the only ones it ever removes)."""
+    return [f"{p.stem}.so" for p in online_programs()] + ["CSUTLDTC.so", "CEEDAYS.so"]
+
+
+MOD_OUT = None  # set in build() (the online program list is needed first)
 COBC = ["cobc", "-std=ibm", "-fsign=EBCDIC", "-I", str(CPY_OUT)]
 
 # CICS response codes (DFHRESP)
@@ -225,9 +235,16 @@ def online_programs():
 
 
 def build():
-    for d in (SRC_OUT, CPY_OUT, MOD_OUT):
+    global MOD_OUT
+    MOD_OUT = modules_dir()
+    for d in (SRC_OUT, CPY_OUT):  # our own scratch directories
         shutil.rmtree(d, ignore_errors=True)
         d.mkdir(parents=True)
+    # The module directory may be a user-chosen directory (CARDDEMO_COBOL_MODULES): never clear it, only
+    # replace the files this build produces.
+    MOD_OUT.mkdir(parents=True, exist_ok=True)
+    for n in module_names():
+        (MOD_OUT / n).unlink(missing_ok=True)
     for d in ("cpy", "cpy-bms"):
         for f in (APP / d).iterdir():
             (CPY_OUT / f.name).write_text(f.read_text(encoding="latin-1").expandtabs(4), encoding="latin-1")
@@ -249,8 +266,9 @@ def build():
     r = subprocess.run(["cobc", "-m", str(HERE / "ceedays.c"), "-o", str(MOD_OUT / "CEEDAYS.so")], capture_output=True, text=True)
     errors += bool(r.returncode)
     sys.stderr.write(r.stderr)
-    n = len(list(MOD_OUT.glob("*.so")))
-    print(f"{n} modules in {MOD_OUT.relative_to(ROOT)}" + (f", {errors} failed" if errors else ""))
+    n = sum((MOD_OUT / m).exists() for m in module_names())
+    shown = os.path.relpath(MOD_OUT, ROOT) if MOD_OUT.is_relative_to(ROOT) else str(MOD_OUT)
+    print(f"{n} modules in {shown}" + (f", {errors} failed" if errors else ""))
     return errors == 0
 
 

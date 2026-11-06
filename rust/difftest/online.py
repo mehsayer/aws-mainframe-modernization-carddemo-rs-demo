@@ -7,10 +7,17 @@ Every screen the terminal shows is recorded (text, map, cursor, each field's con
 attributes) and the two recordings are compared screen by screen. The tests' own assertions (messages,
 data written to the files) must pass in both runs.
 
-  python3 rust/difftest/online.py      # needs GnuCOBOL; builds the COBOL modules first
+  python3 rust/difftest/online.py              # needs GnuCOBOL; builds the COBOL modules first
+  python3 rust/difftest/online.py --rust-only  # no GnuCOBOL: the same tests on the Rust programs only
+
+Machine-readable results (per test, per run) are written to out-online/results.json; that directory is
+cleared first, so results from an earlier run are never reported again.
 """
 import json, os, re, shutil, subprocess, sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cobridge"))
+import cicsprep  # noqa: E402  (the module-directory rule)
 
 HERE = Path(__file__).resolve().parent
 RS = HERE.parent
@@ -24,19 +31,15 @@ TESTS = {}  # target -> region -> test name -> {"result": "ok"|"FAILED", "note":
 
 def run(target, region, logdir):
     print(f"  {target}: {region} ...", file=sys.stderr, flush=True)
-    env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir))
+    # absolute module directory for the test binaries, which run in another working directory
+    env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir), CARDDEMO_COBOL_MODULES=str(cicsprep.modules_dir()))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
     r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
                        cwd=RS, env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
-    # a test's result can be pushed to a later line by DISPLAY output of the COBOL programs
-    tests = {}
-    starts = list(re.finditer(r"^test (\w+) \.\.\. ", out, re.M))
-    for k, m in enumerate(starts):
-        chunk = out[m.end():starts[k + 1].start() if k + 1 < len(starts) else len(out)]
-        res = re.search(r"(ok|FAILED)\s*$", chunk.split("\n\n")[0], re.M)
-        tests[m.group(1)] = {"result": res.group(1) if res else "?", "note": ""}
+    # the COBOL programs' DISPLAY output goes to a sysout file (tests/common), so libtest's lines are clean
+    tests = {m.group(1): {"result": m.group(2), "note": ""} for m in re.finditer(r"^test (\w+) \.\.\. (ok|FAILED)$", out, re.M)}
     for m in re.finditer(r"thread '(\w+)'.*?panicked at [^\n]*\n([^\n]*)", out, re.S):
         if m.group(1) in tests:
             tests[m.group(1)]["note"] = m.group(2).strip()[:120]
@@ -89,12 +92,28 @@ def same_screen(x, y):
     return all(u == v or accepted(u, v) for u, v in zip(x, y))
 
 
+def rust_only():
+    """No GnuCOBOL: run the same tests on the Rust programs and write results.json (no comparison)."""
+    ok = True
+    for target in TARGETS:
+        d = OUT / target / "rust"
+        d.mkdir(parents=True)
+        p, f = run(target, "rust", d)
+        ok &= f == 0
+    (OUT / "results.json").write_text(json.dumps({"ok": ok, "rust_only": True, "tests": TESTS}, indent=1))
+    print(f"Rust only: {'all tests pass' if ok else 'failures'} (no comparison with the original)")
+    sys.exit(0 if ok else 1)
+
+
 def main():
+    shutil.rmtree(OUT, ignore_errors=True)  # never leave an earlier run's results behind
+    OUT.mkdir(parents=True)
+    if "--rust-only" in sys.argv:
+        rust_only()
     print("  building the original COBOL screen programs ...", file=sys.stderr, flush=True)
     b = subprocess.run([sys.executable, str(RS / "cobridge" / "cicsprep.py")], capture_output=True, text=True)
     if b.returncode:
         sys.exit(b.stdout + b.stderr)
-    shutil.rmtree(OUT, ignore_errors=True)
     rows, details, total_screens, same_screens, ok = [], [], 0, 0, True
     for target in TARGETS:
         res = {}

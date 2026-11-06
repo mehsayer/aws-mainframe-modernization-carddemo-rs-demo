@@ -101,3 +101,15 @@ Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.
   it needs, module directory rule shared with the runtime and cicsprep (`CARDDEMO_COBOL_MODULES`).
 - execute.py runs the scripted suite once (inside online.py, on Rust and COBOL); TC-DIF-01 logged as
   "Pass (step 2)", the manual step 1 is stated as not executed.
+
+### Code review (2026-11-06, `/code-review xhigh`): all 15 findings fixed
+- cicsprep never clears a user-chosen module directory (replaces only its own 19 files); paths outside the
+  repository work; one module-directory rule (empty = unset, relative made absolute) in cicsprep/Rust, imported
+  by demo.py and online.py.
+- Exit handler restores stdout/stderr before the terminal and only while the TUI is on screen; panics in the
+  bridge become an ASRA abend instead of crossing into libcob.
+- Clock frozen for COBOL only when CARDDEMO_NOW parses (`online::common::fixed_now`).
+- CARDDEMO_LIBCOB is exact (no silent fallback); loader errors are reported; no fd leak; libc crate constants.
+- COBOL DISPLAY output in test runs goes to a sysout file; online.py's parser is the plain one, clears old
+  results first, and has `--rust-only`; execute.py uses it as the single fallback; the suite summary reads
+  "41 of 42 passed" plus the partly manual TC-DIF-01.
