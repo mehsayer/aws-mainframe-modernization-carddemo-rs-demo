@@ -58,8 +58,38 @@ fn ebcdic_key_order() {
 #[test]
 fn transactions_roll_back() {
     let v = store();
-    v.begin();
+    v.begin().unwrap();
     v.delete("CCXREF", b"0000000000000003").unwrap();
-    v.rollback();
+    v.rollback().unwrap();
     assert!(v.read("CCXREF", b"0000000000000003").is_ok());
+}
+
+#[test]
+fn failed_operation_leaves_no_partial_index_rows() {
+    // simulates a REWRITE/WRITE that fails after an alternate-index row was already changed
+    let v = store();
+    let r: VResult<()> = v.atomic(|| {
+        v.conn.execute("DELETE FROM \"a_CARDXREF_ACCTID\"", []).map_err(|_| Resp::IoErr)?;
+        Err(Resp::DupRec)
+    });
+    assert_eq!(r, Err(Resp::DupRec));
+    let n: i64 = v.conn.query_row("SELECT count(*) FROM \"a_CARDXREF_ACCTID\"", [], |r| r.get(0)).unwrap();
+    assert_eq!(n, 3, "index rows restored");
+    assert_eq!(v.read_ex("CXACAIX", b"00000000002").unwrap().0[..16], b"0000000000000003"[..]);
+}
+
+#[test]
+fn begin_reports_a_busy_store() {
+    let dir = std::env::temp_dir().join(format!("vsam-busy-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = Vsam::open(dir.join("db")).unwrap();
+    let b = Vsam::open(dir.join("db")).unwrap();
+    b.set_busy_timeout(std::time::Duration::from_millis(50)).unwrap();
+    a.begin().unwrap();
+    assert!(b.begin().is_err(), "second unit of work must fail, not run in autocommit");
+    assert!(!b.in_unit_of_work());
+    a.commit().unwrap();
+    assert!(b.begin().is_ok());
+    b.rollback().unwrap();
 }

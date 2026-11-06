@@ -53,14 +53,21 @@ pub const SEED: &[(&str, &str)] = &[
 /// Reset the store to the shipped sample data (DELETE/DEFINE + REPRO of every cluster).
 pub fn reset(vsam: &Vsam, seed_dir: &Path) -> Result<Vec<(String, usize)>, String> {
     let mut out = Vec::new();
-    vsam.begin();
-    for ds in vsam::CATALOG {
-        vsam.clear(ds.name).map_err(|e| e.to_string())?;
+    vsam.begin().map_err(|_| "the data store is busy (another job or terminal holds it)".to_string())?;
+    let load = |out: &mut Vec<(String, usize)>| -> Result<(), String> {
+        for ds in vsam::CATALOG {
+            vsam.clear(ds.name).map_err(|e| e.to_string())?;
+        }
+        for (ds, f) in SEED {
+            let n = repro_in(vsam, ds, &seed_dir.join(f), Format::Ebcdic)?;
+            out.push((ds.to_string(), n));
+        }
+        Ok(())
+    };
+    if let Err(e) = load(&mut out) {
+        let _ = vsam.rollback();
+        return Err(e);
     }
-    for (ds, f) in SEED {
-        let n = repro_in(vsam, ds, &seed_dir.join(f), Format::Ebcdic)?;
-        out.push((ds.to_string(), n));
-    }
-    vsam.commit();
+    vsam.commit().map_err(|_| "reset could not be committed".to_string())?;
     Ok(out)
 }

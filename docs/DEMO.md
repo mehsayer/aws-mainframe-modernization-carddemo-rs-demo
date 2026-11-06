@@ -219,7 +219,7 @@ codes and console messages. It ends with **"Overall: all outputs identical"**. T
   time, spread over two sessions, plus a person reviewing the plan and the results.
 - **Proof, not promises.** The new system is checked against the old one by running both, not by reading
   code. The checks are repeatable: anyone can run the commands above.
-- **The AI found problems in the original.** Eleven defects are documented in the requirements
+- **The AI found problems in the original.** Twelve defects are documented in the requirements
   (`docs/requirements.pdf`, "Known defects"). Two programs in the original do not even compile.
 - **People stay in control.** The AI wrote a plan and waited for approval. It writes down everything it
   decides, and it is told what to review and what never to change. Those instructions live in

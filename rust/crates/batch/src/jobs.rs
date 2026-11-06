@@ -19,6 +19,9 @@ pub struct Env<'a> {
     pub echo: bool,
 }
 
+/// User abend code of a step that could not obtain or commit its unit of work.
+pub const UOW_ABEND: i32 = 998;
+
 /// Outcome of one job step.
 #[derive(Debug, Clone)]
 pub struct StepLog {
@@ -57,22 +60,36 @@ impl Env<'_> {
         for (n, d) in dds {
             ctx = ctx.dd(n, d);
         }
-        self.vsam.begin();
-        let rc = f(&mut ctx);
-        match &rc {
-            Ok(_) => self.vsam.commit(),
-            // an abending batch step leaves VSAM updates made so far in place
-            // (no rollback on the mainframe either), so commit them too
-            Err(_) => self.vsam.commit(),
+        if self.vsam.begin().is_err() {
+            let msg = format!("{step} {program}: NOT RUN, THE DATA STORE IS BUSY (ANOTHER JOB OR TERMINAL HOLDS IT)");
+            if self.echo {
+                println!("{msg}");
+            }
+            logs.push(StepLog { step: step.into(), program: program.into(), rc: Err(Abend(UOW_ABEND)), sysout: vec![msg] });
+            return Err(Abend(UOW_ABEND));
+        }
+        let mut rc = f(&mut ctx);
+        // an abending batch step leaves VSAM updates made so far in place (no rollback on the
+        // mainframe either), so they are committed in both cases
+        if self.vsam.commit().is_err() {
+            ctx.display(format!("{step} {program}: UPDATES COULD NOT BE COMMITTED"));
+            rc = Err(Abend(UOW_ABEND));
         }
         logs.push(StepLog { step: step.into(), program: program.into(), rc: rc.clone(), sysout: ctx.sysout });
         rc
     }
 
     fn util(&self, logs: &mut Vec<StepLog>, step: &str, program: &str, f: impl FnOnce() -> Result<String, String>) -> Result<i32, Abend> {
-        self.vsam.begin();
-        let r = f();
-        self.vsam.commit();
+        let r = match self.vsam.begin() {
+            Err(_) => Err("NOT RUN, THE DATA STORE IS BUSY (ANOTHER JOB OR TERMINAL HOLDS IT)".to_string()),
+            Ok(()) => {
+                let r = f();
+                match self.vsam.commit() {
+                    Ok(()) => r,
+                    Err(_) => Err("UPDATES COULD NOT BE COMMITTED".to_string()),
+                }
+            }
+        };
         let (rc, msg) = match r {
             Ok(m) => (Ok(0), m),
             Err(m) => (Ok(12), m),

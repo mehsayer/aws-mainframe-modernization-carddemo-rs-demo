@@ -43,6 +43,8 @@ pub struct Task<'a> {
     terminal: Screen,
     pub sent: Option<Screen>,
     held: HashMap<String, Vec<u8>>,
+    /// a SYNCPOINT could not commit or reopen the unit of work: the task is abended at the end
+    uow_failed: bool,
     pub applid: String,
     pub sysid: String,
     pub tdq: Vec<(String, Vec<u8>)>,
@@ -95,6 +97,17 @@ impl<'a> Task<'a> {
 
     // ---- file control ----------------------------------------------------
     /// READ [UPDATE]
+    /// READ through a non-unique alternate index: like CICS, the first record is returned even when
+    /// the response is DUPKEY (the bool is true then).
+    pub fn read_dup(&mut self, file: &str, key: &[u8]) -> Result<(Vec<u8>, bool), Resp> {
+        let r = self.vsam.read_ex(file.trim(), key);
+        self.eibresp = match &r {
+            Ok((_, true)) => Resp::DupKey.code(),
+            Ok(_) => 0,
+            Err(e) => e.code(),
+        };
+        r
+    }
     pub fn read(&mut self, file: &str, key: &[u8], update: bool) -> Result<Vec<u8>, Resp> {
         let r = self.vsam.read(file.trim(), key);
         self.eibresp = r.as_ref().map_or_else(|e| e.code(), |_| 0);
@@ -134,11 +147,15 @@ impl<'a> Task<'a> {
         self.vsam.read_prev(br)
     }
     pub fn syncpoint(&mut self) {
-        self.vsam.syncpoint();
+        if self.vsam.syncpoint().is_err() {
+            self.uow_failed = true;
+        }
         self.held.clear();
     }
     pub fn syncpoint_rollback(&mut self) {
-        self.vsam.syncpoint_rollback();
+        if self.vsam.syncpoint_rollback().is_err() {
+            self.uow_failed = true;
+        }
         self.held.clear();
     }
     /// WRITEQ TD
@@ -183,7 +200,16 @@ impl Region {
             sess.next_transid = None;
             return;
         };
-        self.vsam.begin();
+        if self.vsam.begin().is_err() {
+            // no unit of work: do not run the program (its updates could not be backed out)
+            sess.screen = Screen {
+                text: Some(format!(
+                    "Transaction {tran} not started: the data store is busy (another terminal or batch job holds it). No updates were made. Press Enter to retry."
+                )),
+                ..Default::default()
+            };
+            return;
+        }
         let mut task = Task {
             vsam: &self.vsam,
             maps: &self.maps,
@@ -196,6 +222,7 @@ impl Region {
             terminal: sess.screen.clone(),
             sent: None,
             held: HashMap::new(),
+            uow_failed: false,
             applid: self.applid.clone(),
             sysid: self.sysid.clone(),
             tdq: Vec::new(),
@@ -223,9 +250,16 @@ impl Region {
                 Err(t) => break t,
             }
         };
+        let outcome = match outcome {
+            Transfer::Return { .. } if task.uow_failed => Transfer::Abend("AUOW".into()),
+            Transfer::Return { transid, commarea } => match self.vsam.commit() {
+                Ok(()) => Transfer::Return { transid, commarea },
+                Err(_) => Transfer::Abend("AUOW".into()),
+            },
+            o => o,
+        };
         match outcome {
             Transfer::Return { transid, commarea } => {
-                self.vsam.commit();
                 if let Some(s) = task.sent.take() {
                     sess.screen = s;
                 }
@@ -240,11 +274,13 @@ impl Region {
                 }
             }
             Transfer::Abend(code) => {
-                self.vsam.rollback();
-                sess.screen = Screen {
-                    text: Some(format!("DFHAC2206 Transaction {tran} failed with abend {code}. Updates to local recoverable resources backed out.")),
-                    ..Default::default()
+                let backed_out = !self.vsam.in_unit_of_work() || self.vsam.rollback().is_ok();
+                let text = if backed_out {
+                    format!("DFHAC2206 Transaction {tran} failed with abend {code}. Updates to local recoverable resources backed out.")
+                } else {
+                    format!("DFHAC2206 Transaction {tran} failed with abend {code}. Updates could NOT be backed out.")
                 };
+                sess.screen = Screen { text: Some(text), ..Default::default() };
                 sess.next_transid = None;
                 sess.commarea.clear();
             }

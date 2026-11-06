@@ -379,7 +379,9 @@ pub fn cousr01c(t: &mut Task) -> Cr {
                 }
                 if !err {
                     map.cursor("FNAME");
-                    let mut u = SecUserData::new();
+                    // SEC-USER-DATA: WORKING-STORAGE without VALUE; only the named fields are moved, so
+                    // SEC-USR-FILLER stays binary zeros
+                    let mut u = SecUserData::from_bytes(&[0u8; SecUserData::LEN]);
                     u.set_sec_usr_id(map.get("USERID"));
                     u.set_sec_usr_fname(map.get("FNAME"));
                     u.set_sec_usr_lname(map.get("LNAME"));

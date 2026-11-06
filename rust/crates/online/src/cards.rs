@@ -599,7 +599,7 @@ struct Sl {
 }
 
 /// PF3 handling shared by the detail / update / account programs (BR-AC-04).
-pub fn pf3_back(t: &Task, c: &mut CarddemoCommarea, tran: &str, pgm: &str, mapset: &str, map: &str, clear_keys_if_list: bool) -> cics::Transfer {
+pub fn pf3_back(t: &mut Task, c: &mut CarddemoCommarea, tran: &str, pgm: &str, mapset: &str, map: &str, clear_keys_if_list: bool) -> cics::Transfer {
     let to_tran = if blank(c.cdemo_from_tranid()) { "CM00".to_string() } else { text::s(c.cdemo_from_tranid()) };
     let to_pgm = if blank(c.cdemo_from_program()) { "COMEN01C".to_string() } else { text::s(c.cdemo_from_program()) };
     c.set_cdemo_to_tranid(to_tran.as_bytes());
@@ -614,7 +614,8 @@ pub fn pf3_back(t: &Task, c: &mut CarddemoCommarea, tran: &str, pgm: &str, mapse
     c.set_cdemo_pgm_context(b"0");
     c.set_cdemo_last_mapset(mapset.as_bytes());
     c.set_cdemo_last_map(map.as_bytes());
-    t.vsam.syncpoint();
+    // EXEC CICS SYNCPOINT: commits and releases the READ UPDATE holds
+    t.syncpoint();
     t.xctl(&to_pgm, Some(&c.buf))
 }
 
@@ -1149,7 +1150,9 @@ fn upd_write(t: &mut Task, s: &mut Upd) -> UpdResult {
         s.set_d(O_OLD, D_STS, card.card_active_status());
         return UpdResult::Changed;
     }
-    let mut u = CardRecord::new();
+    // CARD-UPDATE-RECORD: WORKING-STORAGE without VALUE (binary zeros); INITIALIZE skips its FILLER X(59)
+    let mut u = CardRecord::from_bytes(&[0u8; CardRecord::LEN]);
+    u.initialize();
     u.set_card_num(&s.d(O_NEW, D_CARD));
     u.set_card_acct_id(&s.cc_acct);
     // KD-07: CCUP-NEW-CVV-CD is never filled; the CVV is written as zero

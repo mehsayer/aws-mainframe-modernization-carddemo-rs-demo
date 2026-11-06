@@ -106,6 +106,9 @@ pub fn edit(v: Dec, pic: &str) -> String {
                     out.push(d);
                 }
             }
+            // first symbol of a floating string: a placeholder that only receives the sign when the
+            // first significant digit is immediately to its right
+            '+' | '-' if floating && i == 0 => out.push(' '),
             '+' | '-' => out.push(sign_char(c)),
             '.' => {
                 if float_pending && !significant {
@@ -145,5 +148,15 @@ mod tests {
         assert_eq!(edit(d("-12.3"), "Z(9).99-"), format!("{:>12}-", "12.30"));
         assert_eq!(edit(d("12.3"), "9(9).99-"), "000000012.30 ");
         assert_eq!(edit(d("0.07"), "+ZZZ,ZZZ,ZZZ.99"), format!("+{:>14}", ".07"));
+    }
+    #[test]
+    fn floating_signs() {
+        assert_eq!(edit(d("-12.34"), "-----9.99"), "   -12.34");
+        assert_eq!(edit(d("12.34"), "-----9.99"), "    12.34");
+        assert_eq!(edit(d("5"), "+++9.99"), "  +5.00");
+        assert_eq!(edit(d("-5"), "+++9.99"), "  -5.00");
+        assert_eq!(edit(d("-123"), "----9"), " -123");
+        assert_eq!(edit(d("-1234"), "----9"), "-1234");
+        assert_eq!(edit(d("0"), "---9.99"), "   0.00");
     }
 }

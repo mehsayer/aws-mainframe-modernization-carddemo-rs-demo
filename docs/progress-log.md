@@ -65,3 +65,13 @@ Totals after session 2 (tools/usage.py): ≈1.6 h active, 374 turns, 399 tool ca
   the original application does, CLAUDE.md, human oversight and Remote Control.
 
 Totals after session 3 (tools/usage.py): ≈1.9 h active, ≈0.56M output tokens.
+
+### Code review (2026-11-06, `/code-review medium`, scope `rust/` per CLAUDE.md)
+All 10 findings fixed, with regression tests (`rust/crates/online/tests/review_fixes.rs`, vsam and edit unit tests):
+- KD-13 (new defect of the original): COACTUPC's ACCT-UPDATE-RECORD has no ADDR-ZIP; group id lands at offset 102.
+- Online writes now start from binary zeros (account/customer/card update, user add, transaction add, bill payment).
+- Bill payment: DUPKEY on CXACAIX keeps the first card; NOTFND keeps zeros; STARTBR failure ends in AEIP like KD-10.
+- Units of work: begin/commit/rollback errors are reported; tasks/steps do not run unprotected; the abend
+  message only says "backed out" when it is true. File operations are atomic (savepoint).
+- SYNCPOINT from PF3 goes through the task (releases READ UPDATE holds); floating-sign edit pictures fixed.
+Re-verified: 21 test suites, clippy clean, difftest identical, manual suite 41/41.

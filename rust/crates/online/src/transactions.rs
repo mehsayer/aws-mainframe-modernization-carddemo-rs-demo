@@ -628,7 +628,8 @@ fn last_tran(t: &mut Task, map: &mut Map, ca: &[u8], cursor_acct: bool) -> Resul
     match t.readprev(&mut br) {
         Ok(r) => Ok(TranRecord::from_bytes(&r)),
         Err(Resp::EndFile) => {
-            let mut tr = TranRecord::new();
+            // READPREV INTO TRAN-RECORD did not happen: the area keeps its initial binary zeros
+            let mut tr = TranRecord::from_bytes(&[0u8; TranRecord::LEN]);
             tr.set_tran_id(b"0000000000000000");
             Ok(tr)
         }
@@ -647,7 +648,9 @@ fn next_tran_id(last: &TranRecord) -> String {
 fn ta_add(t: &mut Task, map: &mut Map, ca: &[u8]) -> Cr {
     let last = last_tran(t, map, ca, true)?;
     let id = next_tran_id(&last);
-    let mut tr = TranRecord::new();
+    // INITIALIZE TRAN-RECORD: named fields only; the FILLER keeps what READPREV put there
+    let mut tr = last.clone();
+    tr.initialize();
     tr.set_tran_id(id.as_bytes());
     tr.set_tran_type_cd(map.get("TTYPCD"));
     tr.set_tran_cat_cd(map.get("TCATCD"));
@@ -693,13 +696,13 @@ pub fn cobil00c(t: &mut Task) -> Cr {
         let sel = xget(&ca, X_SEL);
         if !blank(&sel) {
             map.set("ACTIDIN", &sel);
-            bil_enter(t, &mut map, &mut msg, &mut err);
+            bil_enter(t, &mut map, &mut msg, &mut err)?;
         }
         bil_send(t, &mut map, &msg);
     } else {
         map = t.receive_map("COBIL0A");
         match t.eibaid {
-            Aid::Enter => bil_enter(t, &mut map, &mut msg, &mut err),
+            Aid::Enter => bil_enter(t, &mut map, &mut msg, &mut err)?,
             Aid::Pf(3) => {
                 back_to_caller(&mut ca, "COMEN01C");
                 return Err(return_to_prev(t, &mut ca, TRAN, PGM));
@@ -726,7 +729,7 @@ fn bil_clear(map: &mut Map) {
     }
 }
 
-fn bil_enter(t: &mut Task, map: &mut Map, msg: &mut String, err: &mut bool) {
+fn bil_enter(t: &mut Task, map: &mut Map, msg: &mut String, err: &mut bool) -> Cr {
     let mut conf_pay = false;
     if blank(map.get("ACTIDIN")) {
         *err = true;
@@ -773,29 +776,54 @@ fn bil_enter(t: &mut Task, map: &mut Map, msg: &mut String, err: &mut bool) {
         bil_send(t, map, msg);
     }
     if *err {
-        return;
+        return Ok(());
     }
     if conf_pay {
-        // READ-CXACAIX-FILE
-        let xref = match t.read("CXACAIX", acct.acct_id(), false) {
-            Ok(r) => CardXrefRecord::from_bytes(&r),
+        // READ-CXACAIX-FILE INTO CARD-XREF-RECORD (WORKING-STORAGE, no VALUE: binary zeros, with
+        // XREF-ACCT-ID = the account id moved there as RIDFLD). DUPKEY still returns the first record;
+        // NOTFND leaves the area as it was. Either way the message is sent and the payment goes on.
+        let mut xref = CardXrefRecord::from_bytes(&[0u8; CardXrefRecord::LEN]);
+        xref.set_xref_acct_id(acct.acct_id());
+        match t.read_dup("CXACAIX", acct.acct_id()) {
+            Ok((r, false)) => xref = CardXrefRecord::from_bytes(&r),
+            Ok((r, true)) => {
+                xref = CardXrefRecord::from_bytes(&r);
+                *msg = "Unable to lookup XREF AIX file...".into();
+                map.cursor("ACTIDIN");
+                bil_send(t, map, msg);
+            }
             Err(e) => {
                 *msg = if e == Resp::NotFnd { "Account ID NOT found..." } else { "Unable to lookup XREF AIX file..." }.into();
                 map.cursor("ACTIDIN");
                 bil_send(t, map, msg);
-                CardXrefRecord::new()
             }
-        };
-        let last = match t.startbr(FILE, &[0xFF; 16], true).and_then(|mut b| t.readprev(&mut b)) {
-            Ok(r) => TranRecord::from_bytes(&r),
-            Err(_) => {
-                let mut tr = TranRecord::new();
-                tr.set_tran_id(b"0000000000000000");
-                tr
+        }
+        // STARTBR (HIGH-VALUES) / READPREV / ENDBR. ENDBR has no RESP: when STARTBR failed there is no
+        // browse to end, CICS raises INVREQ and the task abends AEIP (as KD-10).
+        let mut last = TranRecord::from_bytes(&[0u8; TranRecord::LEN]);
+        match t.startbr(FILE, &[0xFF; 16], true) {
+            Ok(mut b) => match t.readprev(&mut b) {
+                Ok(r) => last = TranRecord::from_bytes(&r),
+                Err(Resp::EndFile) => last.set_tran_id(b"0000000000000000"),
+                Err(_) => {
+                    *msg = "Unable to lookup Transaction...".into();
+                    map.cursor("ACTIDIN");
+                    bil_send(t, map, msg);
+                    last.set_tran_id(&[0xFF; 16]);
+                }
+            },
+            Err(e) => {
+                *msg = if e == Resp::NotFnd { "Transaction ID NOT found..." } else { "Unable to lookup Transaction..." }.into();
+                map.cursor("ACTIDIN");
+                bil_send(t, map, msg);
+                // READPREV without a browse: INVREQ -> 'Unable to lookup Transaction...'; then ENDBR abends
+                return Err(t.abend("AEIP"));
             }
-        };
+        }
         let id = next_tran_id(&last);
-        let mut tr = TranRecord::new();
+        // INITIALIZE TRAN-RECORD: named fields only; the FILLER keeps the READPREV data (or zeros)
+        let mut tr = last.clone();
+        tr.initialize();
         tr.set_tran_id(id.as_bytes());
         tr.set_tran_type_cd(b"02");
         tr.set_tran_cat_cd_n(Dec::from(2));
@@ -836,6 +864,7 @@ fn bil_enter(t: &mut Task, map: &mut Map, msg: &mut String, err: &mut bool) {
         map.cursor("CONFIRM");
     }
     bil_send(t, map, msg);
+    Ok(())
 }
 
 // ===================================================================== CORPT00C

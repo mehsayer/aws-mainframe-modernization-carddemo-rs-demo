@@ -23,6 +23,10 @@ struct Fetched {
     acct_not_ok: bool,
 }
 
+/// ACCT-UPDATE-RECORD (COACTUPC): group id at offset 102, FILLER from 112 (see KD-13).
+const ACCT_UPDATE_GROUP: usize = 102;
+const ACCT_UPDATE_FILLER: usize = 112;
+
 /// STRING ... INTO WS-RETURN-MSG (PIC X(75)): longer messages are cut at 75 characters.
 fn ret_msg(m: String) -> String {
     m.chars().take(75).collect()
@@ -782,7 +786,13 @@ fn acu_write(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea) -> u8 {
         return b'S';
     }
     let nv = |k: &str| s.nv(k);
-    let mut na = AccountRecord::new();
+    // ACCT-UPDATE-RECORD (WORKING-STORAGE, no VALUE: binary zeros) differs from CVACT01Y: it has no
+    // ACCT-ADDR-ZIP, so ACCT-UPDATE-GROUP-ID lies at offset 102 (the master's ZIP slot) and offsets
+    // 112..300 are FILLER. INITIALIZE leaves that FILLER as zeros. KD-13: the group id is written into the
+    // ZIP field and the master's group id becomes X'00'.
+    let mut na = AccountRecord::from_bytes(&[0u8; AccountRecord::LEN]);
+    na.initialize();
+    na.buf[ACCT_UPDATE_FILLER..].fill(0);
     na.set_acct_id(&key);
     na.set_acct_active_status(&nv("status"));
     let m = |k: &str| s.new.money.get(k).and_then(|x| x.1).unwrap_or(Dec::ZERO);
@@ -795,8 +805,10 @@ fn acu_write(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea) -> u8 {
     na.set_acct_open_date(&date("open_y", "open_m", "open_d"));
     na.set_acct_expiraion_date(&date("exp_y", "exp_m", "exp_d"));
     na.set_acct_reissue_date(&date("ris_y", "ris_m", "ris_d"));
-    na.set_acct_group_id(&nv("group"));
-    let mut nc = CustomerRecord::new();
+    cobol::text::mv(&mut na.buf[ACCT_UPDATE_GROUP..ACCT_UPDATE_FILLER], &nv("group"));
+    // CUST-UPDATE-RECORD has the CVCUS01Y layout; its FILLER X(168) stays binary zeros
+    let mut nc = CustomerRecord::from_bytes(&[0u8; CustomerRecord::LEN]);
+    nc.initialize();
     nc.set_cust_id(&nv("cust_id"));
     nc.set_cust_first_name(&nv("fname"));
     nc.set_cust_middle_name(&nv("mname"));

@@ -37,7 +37,7 @@ header-includes:
 - All **30 programs** translated, working and tested
 - **Identical results**: 40 of 40 output comparisons against the original COBOL
 - **41 of 41** test cases passed
-- **11 defects** found in the original, documented, not silently changed
+- **12 defects** found in the original, documented, not silently changed
 - About **2 hours** of AI working time, with one engineer supervising
 ::::
 :::
@@ -170,7 +170,7 @@ derived work by Illia Burov. This pilot is not affiliated with or endorsed by Am
 | Output comparisons vs. COBOL | 40 / 40 identical |
 | Manual test cases | 41 / 41 passed |
 | Automated test suites | 20, all passing |
-| Defects found in the original | 11 |
+| Defects found in the original | 12 |
 | AI working time | ≈ 1.9 h |
 ::::
 :::: {.column width="48%"}
@@ -208,7 +208,8 @@ Anyone can repeat this check with one command (see the live demo).
 - The transaction report counts the last amount twice
 - Updating a card resets its security code to 000
 - Two programs **do not compile** as shipped
-- ... 11 in total
+- Saving an account moves its group id into the ZIP-code field
+- ... 12 in total
 ::::
 :::: {.column width="46%"}
 **In its own translation** (found and fixed by the comparison)
@@ -216,6 +217,7 @@ Anyone can repeat this check with one command (see the live demo).
 - 9 subtle differences, e.g. what is in unused bytes of a record, or a message cut at 75 instead of 78 characters
 - None were visible in normal tests. All were caught by **running the original**
 - 8 test-case descriptions were also corrected against the original code
+- An AI **code review** (scoped by `CLAUDE.md` to the Rust code) then found 10 more issues, all fixed with tests
 ::::
 :::
 
@@ -380,5 +382,6 @@ cases as scripted terminal sessions and multi-user tests).
 | KD-08 | Account update screen | the "blank phone number" test checks the area code twice |
 | KD-10 | User / transaction lists | searching past the last record crashes the transaction |
 | KD-12 | Export / import | the programs do not compile as shipped |
+| KD-13 | Account update screen | the group id is saved into the ZIP-code field |
 
-All 11 are in the requirements specification, with the exact behaviour that the translation reproduces.
+All 12 are in the requirements specification, with the exact behaviour that the translation reproduces.

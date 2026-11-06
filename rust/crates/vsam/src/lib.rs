@@ -116,6 +116,11 @@ impl Vsam {
         Ok(v)
     }
 
+    /// How long a unit of work waits for another connection's write lock (default 30 s).
+    pub fn set_busy_timeout(&self, d: std::time::Duration) -> rusqlite::Result<()> {
+        self.conn.busy_timeout(d)
+    }
+
     pub fn open_in_memory() -> rusqlite::Result<Self> {
         let v = Vsam { conn: Connection::open_in_memory()? };
         v.define_all()?;
@@ -140,23 +145,30 @@ impl Vsam {
     }
 
     // ---- unit of work -------------------------------------------------------
-    pub fn begin(&self) {
-        let _ = self.conn.execute_batch("BEGIN IMMEDIATE");
+    /// Start a unit of work (takes the store's write lock, waiting up to the busy timeout).
+    /// Fails if the lock cannot be obtained or a unit of work is already open: the caller must not
+    /// run updates then, because they would autocommit one by one and could not be backed out.
+    pub fn begin(&self) -> VResult<()> {
+        self.conn.execute_batch("BEGIN IMMEDIATE").map_err(|_| Resp::IoErr)
     }
-    pub fn commit(&self) {
-        let _ = self.conn.execute_batch("COMMIT");
+    pub fn commit(&self) -> VResult<()> {
+        self.conn.execute_batch("COMMIT").map_err(|_| Resp::IoErr)
     }
-    pub fn rollback(&self) {
-        let _ = self.conn.execute_batch("ROLLBACK");
+    pub fn rollback(&self) -> VResult<()> {
+        self.conn.execute_batch("ROLLBACK").map_err(|_| Resp::IoErr)
+    }
+    /// True while a unit of work is open.
+    pub fn in_unit_of_work(&self) -> bool {
+        !self.conn.is_autocommit()
     }
     /// SYNCPOINT: commit and start a new unit of work.
-    pub fn syncpoint(&self) {
-        self.commit();
-        self.begin();
+    pub fn syncpoint(&self) -> VResult<()> {
+        self.commit()?;
+        self.begin()
     }
-    pub fn syncpoint_rollback(&self) {
-        self.rollback();
-        self.begin();
+    pub fn syncpoint_rollback(&self) -> VResult<()> {
+        self.rollback()?;
+        self.begin()
     }
 
     // ---- path resolution ----------------------------------------------------
@@ -251,8 +263,27 @@ impl Vsam {
         Ok(())
     }
 
+    /// Run one file operation all-or-nothing: base record and alternate-index rows change together.
+    /// A savepoint works both inside a unit of work and in autocommit mode.
+    fn atomic<T>(&self, op: impl FnOnce() -> VResult<T>) -> VResult<T> {
+        self.conn.execute_batch("SAVEPOINT vsam_op").map_err(|_| Resp::IoErr)?;
+        match op() {
+            Ok(v) => {
+                self.conn.execute_batch("RELEASE vsam_op").map_err(|_| Resp::IoErr)?;
+                Ok(v)
+            }
+            Err(e) => {
+                let _ = self.conn.execute_batch("ROLLBACK TO vsam_op; RELEASE vsam_op");
+                Err(e)
+            }
+        }
+    }
+
     /// WRITE a new record (key taken from the record).
     pub fn write(&self, file: &str, rec: &[u8]) -> VResult<()> {
+        self.atomic(|| self.write_raw(file, rec))
+    }
+    fn write_raw(&self, file: &str, rec: &[u8]) -> VResult<()> {
         let p = self.path(file)?;
         let ds = p.ds;
         let rec = fix_len(rec, ds.rec_len);
@@ -269,6 +300,9 @@ impl Vsam {
 
     /// REWRITE an existing record (key taken from the record).
     pub fn rewrite(&self, file: &str, rec: &[u8]) -> VResult<()> {
+        self.atomic(|| self.rewrite_raw(file, rec))
+    }
+    fn rewrite_raw(&self, file: &str, rec: &[u8]) -> VResult<()> {
         let p = self.path(file)?;
         let ds = p.ds;
         let rec = fix_len(rec, ds.rec_len);
@@ -284,6 +318,9 @@ impl Vsam {
 
     /// DELETE by primary key.
     pub fn delete(&self, file: &str, key: &[u8]) -> VResult<()> {
+        self.atomic(|| self.delete_raw(file, key))
+    }
+    fn delete_raw(&self, file: &str, key: &[u8]) -> VResult<()> {
         let p = self.path(file)?;
         let ds = p.ds;
         let ek = ekey(&key[..ds.key_len.min(key.len())]);
