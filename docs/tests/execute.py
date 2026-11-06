@@ -4,14 +4,15 @@
 - The online and batch cases run as scripted terminal sessions (rust/crates/online/tests/manual_suite.rs).
   They run once, inside rust/difftest/online.py, which runs them on the Rust programs and on the original
   COBOL programs and compares every screen; the Rust results are the execution result, the COBOL run is
-  noted. Without GnuCOBOL the suite runs on Rust only.
+  noted. Without GnuCOBOL, or if the comparison fails, the suite runs on Rust only; a failed comparison
+  run's output is kept in rust/difftest/out-online-failed and TC-DIF-01 is logged as Fail.
 - TC-BAT-08 runs the batch comparison (rust/difftest/run.py).
 - TC-DIF-01: step 2 is the online comparison; step 1 (an interactive side-by-side session) is manual and is
   not executed by this script, which the log says.
 
   python3 docs/tests/execute.py        # then: python3 docs/tests/build.py
 """
-import datetime, json, os, re, subprocess, sys
+import datetime, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RS = os.path.join(HERE, "..", "..", "rust")
@@ -19,7 +20,12 @@ sys.path.insert(0, HERE)
 from cases import CASES  # noqa: E402
 
 ONLINE = os.path.join(RS, "difftest", "online.py")
-RESULTS = os.path.join(RS, "difftest", "out-online", "results.json")
+OUT_ONLINE = os.path.join(RS, "difftest", "out-online")
+RESULTS = os.path.join(OUT_ONLINE, "results.json")
+FAILED = os.path.join(RS, "difftest", "out-online-failed")  # a failed comparison run, kept for diagnosis
+
+
+failure = ""  # why the comparison run gave no result
 
 
 def run_online(*args):
@@ -29,18 +35,28 @@ def run_online(*args):
     if os.path.exists(RESULTS):
         os.remove(RESULTS)
     r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
-    if not os.path.exists(RESULTS):
-        sys.stderr.write(f"online.py {' '.join(args)} did not complete (exit code {r.returncode}):\n{r.stderr[-2000:]}\n")
-        return None
-    res = json.load(open(RESULTS))
-    if r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok")):
-        sys.stderr.write(f"online.py {' '.join(args)}: exit code {r.returncode} does not match its results:\n{r.stderr[-2000:]}\n")
-        return None
+    global failure
+    res = json.load(open(RESULTS)) if os.path.exists(RESULTS) else None
+    if res is None:
+        failure = f"did not complete (exit code {r.returncode})"
+    elif r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok")):
+        failure, res = f"exit code {r.returncode} does not match its results", None
+    if res is None:
+        sys.stderr.write(f"online.py {' '.join(args)} {failure}:\n{r.stderr[-2000:]}\n")
+        if not args and os.path.isdir(OUT_ONLINE):
+            # the --rust-only fallback clears out-online: keep this run's report and screen logs
+            shutil.rmtree(FAILED, ignore_errors=True)
+            shutil.move(OUT_ONLINE, FAILED)
+            with open(os.path.join(FAILED, "stderr.txt"), "w") as f:
+                f.write(r.stdout + r.stderr)
     return res
 
 
 online = run_online()
-if online is None:  # e.g. no GnuCOBOL: the same tests on Rust only (same parser, same results format)
+if online is not None:
+    shutil.rmtree(FAILED, ignore_errors=True)  # an earlier failure's output no longer applies
+no_cobol = shutil.which("cobc") is None
+if online is None:  # no GnuCOBOL, or the comparison failed: the same tests on Rust only (same parser and format)
     rust_run = run_online("--rust-only")
     if rust_run is None:
         sys.exit("the scripted test suite could not run")
@@ -61,8 +77,10 @@ for c in CASES:
                     "notes": f"difftest/run.py: {rows} comparisons, " + ("all identical" if d.returncode == 0 else "differences, see report")}
         continue
     if cid == "TC-DIF-01":
-        if online is None:
-            res[cid] = {"result": "Not run", "notes": "online.py could not run (GnuCOBOL missing?)"}
+        if online is None and no_cobol:
+            res[cid] = {"result": "Not run", "notes": "online.py could not run: GnuCOBOL (cobc) not installed"}
+        elif online is None:
+            res[cid] = {"result": "Fail", "notes": f"online.py {failure}; its output is in rust/difftest/out-online-failed"}
         else:
             res[cid] = {"result": "Pass (step 2)" if online["ok"] else "Fail",
                         "notes": f"step 2: {online['identical']}/{online['screens']} screens identical; "

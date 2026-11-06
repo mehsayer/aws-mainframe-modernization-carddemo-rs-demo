@@ -295,6 +295,12 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
 
     let mut term = ratatui::init();
+    if cobol {
+        // ratatui::init() wrapped the panic hook (the first COBOL call above has already installed the
+        // bridge's): install the bridge's check again on top, so a panic inside an EXEC CICS call (an
+        // ASRA abend, the UI keeps running) does not run ratatui's terminal restore
+        cobridge::install_panic_hook();
+    }
     TUI_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
     let res = (|| -> Result<()> {
         loop {
@@ -331,9 +337,6 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     ratatui::restore();
     res
 }
-
-/// The COBOL sysout file, named by the exit handler when libcob ends the process under the UI.
-static SYSOUT_PATH: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 /// True while the full-screen UI is on the terminal (the exit handler restores the terminal only then).
 static TUI_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -466,23 +469,23 @@ fn run_submitted(home: &Path, seed: Option<PathBuf>, deck: &[Vec<u8>]) -> String
 
 /// The original COBOL programs on the CICS bridge. Their DISPLAY output and any libcob message go to
 /// `<home>/cobol-sysout.log`; if libcob ends the process (runtime error, STOP RUN), the terminal is
-/// restored on the way out.
+/// restored on the way out and the user is told where libcob's message is.
 fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
     cobridge::check().map_err(anyhow::Error::msg)?;
-    let sysout = home.join("cobol-sysout.log");
-    cobridge::set_sysout(&sysout)?;
-    let _ = SYSOUT_PATH.set(sysout);
-    // libcob may end the process from inside a COBOL call (runtime error, STOP RUN). stdout/stderr are
-    // then still redirected to the sysout file: put them back first, and restore the terminal only if
-    // the UI is still on screen (a normal exit has already restored it). libcob's message went to the
-    // sysout file, so say where it is.
+    cobridge::set_sysout(&home.join("cobol-sysout.log"))?;
+    // Runs at every process exit. stdout/stderr are still redirected to the sysout file exactly when
+    // libcob ends the process from inside a COBOL call: put them back first, restore the terminal if
+    // the UI is still on screen (a normal exit has already restored it; a Rust panic leaves it on), and
+    // name the sysout file only in the libcob case. Nothing here may panic (no unwinding out of exit).
     extern "C" fn restore_terminal() {
-        cobridge::restore_stdio();
+        let ended_in_cobol = cobridge::restore_stdio();
         if TUI_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst) {
             ratatui::restore();
-            if let Some(p) = SYSOUT_PATH.get() {
-                eprintln!("carddemo: the COBOL runtime ended the program; its messages are in {}", p.display());
-            }
+        }
+        if ended_in_cobol {
+            use std::io::Write;
+            let file = cobridge::sysout_path().map(|p| p.display().to_string()).unwrap_or_else(|| "the COBOL sysout file".into());
+            let _ = writeln!(std::io::stderr(), "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {file}");
         }
     }
     unsafe { libc::atexit(restore_terminal) };

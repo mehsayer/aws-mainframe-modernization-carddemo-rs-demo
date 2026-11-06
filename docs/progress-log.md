@@ -128,3 +128,18 @@ Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.
   handler names the sysout file; one clock (`cobol::clock`) for batch, online and the bridge; libc is a
   workspace dependency.
 - Gate in CLAUDE.md and the deck: the manual suite reads "41 of 42 passed" plus TC-DIF-01 "Pass (step 2)".
+
+### Code review (2026-11-06, third `/code-review xhigh`): all 12 findings fixed
+- The bridge's panic hook really comes first now: the first COBOL call runs before `ratatui::init()`, which
+  wrapped it, so the TUI installs it again after init (`cobridge::install_panic_hook`). A test
+  (cobridge/tests/panic_hook.rs) checks both install orders; it fails without the second install.
+- A panic in a bridge call sets EIBRESP/EIBRESP2 to 0 before the ASRA abend (HANDLE ABEND LABEL sees clean
+  values); the hook logs thread, location and (RUST_BACKTRACE) a backtrace, and never panics itself.
+- Exit handler: `restore_stdio()` tells whether a COBOL call was running, so the sysout file is named exactly
+  when libcob ended the process (also before the UI starts), and never for a Rust panic; the path comes from
+  cobridge (`sysout_path`). No second redirect while one is active (no depth counter).
+- Module directory: one `try_modules_dir` for `modules_dir()` and `check()`; cicsprep makes the value
+  absolute like Rust (no symlink resolution), so both name the same path.
+- execute.py: a failed comparison run is kept in rust/difftest/out-online-failed and TC-DIF-01 logged as
+  Fail; "Not run" only when cobc is missing.
+- The bridge calls `cobol::clock` directly.

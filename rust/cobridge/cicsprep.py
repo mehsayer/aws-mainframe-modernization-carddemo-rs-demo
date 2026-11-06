@@ -32,9 +32,13 @@ DEFAULT_MODULES = BUILD / "modules"
 def modules_dir():
     """Where the compiled modules go and where the runtime loads them from. The one rule, also used by
     demo.py and online.py and mirrored by cobridge::modules_dir: a non-empty CARDDEMO_COBOL_MODULES (made
-    absolute against the current directory), else rust/cobridge/build/modules."""
+    absolute against the current directory, symlinks and '..' kept as the OS will resolve them, like Rust's
+    std::path::absolute), else rust/cobridge/build/modules."""
     v = os.environ.get("CARDDEMO_COBOL_MODULES", "")
-    return Path(v).resolve() if v else DEFAULT_MODULES
+    if not v:
+        return DEFAULT_MODULES
+    p = Path(v)
+    return p if p.is_absolute() else Path.cwd() / p
 
 
 def module_names():

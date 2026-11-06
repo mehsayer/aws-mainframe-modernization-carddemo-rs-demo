@@ -4,3 +4,4 @@ target/
 out/
 difftest/build/
 out-online/
+out-online-failed/
