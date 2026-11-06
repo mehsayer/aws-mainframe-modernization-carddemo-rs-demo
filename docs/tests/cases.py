@@ -71,7 +71,7 @@ CASES = [
   ("Type `ZZZZZZZZ` in Search User ID, Enter.", "The screen shows `... Transaction CU00 failed with abend AEIP ...`. Enter returns to sign-on."),
 ]),
 ("TC-USR-04", "Selection codes", "FR-USR-LST-03", A + "; user list shown", [
-  ("Type `X` next to USER0001, Enter.", "`Invalid selection. Valid values are U and D`"),
+  ("Type `X` next to USER0001, Enter.", "`You have reached the bottom of the page...`: with exactly 10 users the read-ahead hits end of file and its message replaces `Invalid selection. Valid values are U and D` (original behaviour)."),
   ("Type `u` next to USER0001, Enter.", "Update User screen with USER0001 pre-filled and `Press PF5 key to save your updates ...`"),
 ]),
 ("TC-USR-05", "Add user: validation and duplicates", "FR-USR-ADD-01..04", A, [
@@ -98,8 +98,8 @@ CASES = [
   ("Account `abc`, Enter.", "`Account Filter must be a non-zero 11 digit number`"),
 ]),
 ("TC-ACV-02", "Account view: display", "FR-ACV-03, -04", U + "; account view", [
-  ("Account `00000000001`, Enter.", "Status `Y`, balance and limits in `+ZZZ,ZZZ,ZZZ.99` form (current balance 194.00), dates, customer name, SSN as `999-99-9999`, address, phones."),
-  ("Account `99999999999`, Enter.", "`Account:99999999999 not found in Cross ref file. Resp:000000013 Reas:000000080`"),
+  ("Account `00000000001`, Enter.", "Status `Y`, balance and limits in `+ZZZ,ZZZ,ZZZ.99` form (current balance `+        194.00`), dates, customer name, SSN as `999-99-9999`, address, phones."),
+  ("Account `99999999999`, Enter.", "`Account:99999999999 not found in Cross ref file.  Resp:000000013  Reas:0000` (two spaces before `Resp:` and `Reas:`; the message is cut at 75 characters)."),
   ("Press F3.", "Main menu."),
 ]),
 ("TC-ACU-01", "Account update: fetch and no-change", "FR-ACU-01..06", U, [
@@ -120,7 +120,7 @@ CASES = [
 ("TC-ACU-03", "Account update: commit", "FR-ACU-08, -09, -10", U + "; account 00000000001 fetched", [
   ("Fix FICO/State/Zip/Phones as in TC-ACU-02, Primary `Y`, Credit Limit `5000`, Enter.", "Info `Changes validated.Press F5 to save`; all fields protected."),
   ("Press F5.", "Info `Changes committed to database`."),
-  ("Press Enter; then view account 00000000001 (option 1).", "The empty search screen is shown; account view shows credit limit 5,000.00."),
+  ("Press Enter; then view account 00000000001 (option 1).", "The empty search screen is shown; account view shows credit limit `+      5,000.00`."),
 ]),
 # ---------------------------------------------------------------- cards
 ("TC-CDL-01", "Card list and paging", "FR-CDL-01, -04, -05, -07", U, [
@@ -154,8 +154,8 @@ CASES = [
   ("Press Enter.", "Back on the card list (called from the list)."),
 ]),
 # ---------------------------------------------------------------- transactions
-("TC-TRL-01", "Transaction list", "FR-TRL-01..05", U, [
-  ("Option `6`.", "10 transactions per page, page `00000001`. Row 1 is the blank initialisation record from DALYTRAN.PS.INIT."),
+("TC-TRL-01", "Transaction list", "FR-TRL-01..05", U + "; daily posting run (TC-BAT-01)", [
+  ("Option `6`.", "Page `00000001`. Row 1 is the initialisation record from DALYTRAN.PS.INIT (key X'00', shown blank). Ten rows per page."),
   ("Search Tran ID `abc`, Enter.", "`Tran ID must be Numeric ...`"),
   ("F8 / F7.", "Next / previous page."),
   ("`S` on row 2, Enter.", "Transaction View with that transaction."),
@@ -175,7 +175,7 @@ CASES = [
 ]),
 ("TC-TRA-02", "Transaction add: copy last and add", "FR-TRA-08..10", U, [
   ("Option `8`, account `00000000001`, press F5.", "Fields copied from the last transaction; `Confirm to add this transaction...`"),
-  ("Confirm `Y`, Enter.", "Green `Transaction added successfully.  Your Tran ID is <n>.`, where n = highest id + 1."),
+  ("Confirm `Y`, Enter.", "Green `Transaction added successfully.  Your Tran ID is <n>.`, where n = highest id + 1 as 16 digits."),
 ]),
 ("TC-BIL-01", "Bill payment", "FR-BIL-01..08", U, [
   ("Option `10`, Enter.", "`Acct ID can NOT be empty...`"),
@@ -202,14 +202,14 @@ CASES = [
 ]),
 ("TC-BAT-03", "Combine and statements", "FR-BAT-STMT-01..07", "TC-BAT-02 done", [
   ("`carddemo job TRANBKP`, `carddemo job COMBTRAN`, `carddemo job CREASTMT`.", "All RC=0000."),
-  ("Open `STATEMNT.PS` and `STATEMNT.HTML`.", "One statement per card/account with name, address, balance, FICO, transaction lines and `Total EXP:`; the HTML shows the same as a table."),
+  ("Open `STATEMNT.PS` and `STATEMNT.HTML`.", "One statement per card/account with name, address, balance, FICO, transaction lines and `Total EXP:`; the HTML shows name/address, basic details and the transactions as a table (it has no total line)."),
 ]),
 ("TC-BAT-04", "Transaction report", "FR-BAT-REPT-01..08, KD-02, KD-03", "TC-BAT-01 done", [
   ("`carddemo job TRANREPT --start 2022-01-01 --end 2099-12-31`.", "Report with header, page totals every 20 lines, account totals and `Grand Total`."),
   ("Check the totals.", "The last transaction's amount is counted twice in the final page total (KD-02); there is no final account total (KD-03)."),
 ]),
 ("TC-BAT-05", "File print utilities", "FR-BAT-RDR-01..03, FR-BAT-VER-01..02", R, [
-  ("`carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`.", "Record dumps as described; READXREF and READCUST print each record twice; DALYVRFY reports unverifiable cards."),
+  ("`carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`.", "Record dumps as described; READXREF and READCUST print each record twice; DALYVRFY shows card, account and customer for each of the 300 daily transactions, and once more for the last one after end of file (FR-BAT-VER-02); all cards verify with the sample data."),
 ]),
 ("TC-BAT-06", "Export / import round trip", "FR-BAT-XPRT-01..05, KD-09", R, [
   ("`carddemo job CBEXPORT`.", "`CBEXPORT: Total Records Exported:` = customers + accounts + xrefs + transactions + cards."),

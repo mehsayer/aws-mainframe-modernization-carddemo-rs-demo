@@ -23,7 +23,12 @@ struct Fetched {
     acct_not_ok: bool,
 }
 
-fn fetch(t: &mut Task, c: &mut CarddemoCommarea, acct_id: &[u8], view_style: bool) -> Fetched {
+/// STRING ... INTO WS-RETURN-MSG (PIC X(75)): longer messages are cut at 75 characters.
+fn ret_msg(m: String) -> String {
+    m.chars().take(75).collect()
+}
+
+fn fetch(t: &mut Task, c: &mut CarddemoCommarea, acct_id: &[u8]) -> Fetched {
     let mut f = Fetched { xref: None, acct: None, cust: None, msg: String::new(), acct_not_ok: false };
     let aid = text::s(acct_id);
     match t.read("CXACAIX", acct_id, false) {
@@ -35,10 +40,8 @@ fn fetch(t: &mut Task, c: &mut CarddemoCommarea, acct_id: &[u8], view_style: boo
         }
         Err(e @ Resp::NotFnd) => {
             f.acct_not_ok = true;
-            f.msg = format!("Account:{aid} not found in Cross ref file.  Resp:{:<10} Reas:{:<10}", format!("{:09}", e.code()), format!("{:09}", e.code2()));
-            if view_style {
-                f.msg = format!("Account:{aid} not found in Cross ref file. Resp:{:<10} Reas:{:<10}", format!("{:09}", e.code()), format!("{:09}", e.code2()));
-            }
+            // same literal in COACTVWC and COACTUPC: ' Cross ref file.  Resp:' (two spaces)
+            f.msg = ret_msg(format!("Account:{aid} not found in Cross ref file.  Resp:{:<10} Reas:{:<10}", format!("{:09}", e.code()), format!("{:09}", e.code2())));
             return f;
         }
         Err(e) => {
@@ -51,7 +54,7 @@ fn fetch(t: &mut Task, c: &mut CarddemoCommarea, acct_id: &[u8], view_style: boo
         Ok(r) => f.acct = Some(AccountRecord::from_bytes(&r)),
         Err(e @ Resp::NotFnd) => {
             f.acct_not_ok = true;
-            f.msg = format!("Account:{aid} not found in Acct Master file.Resp:{:<10} Reas:{:<10}", format!("{:09}", e.code()), format!("{:09}", e.code2()));
+            f.msg = ret_msg(format!("Account:{aid} not found in Acct Master file.Resp:{:<10} Reas:{:<10}", format!("{:09}", e.code()), format!("{:09}", e.code2())));
             return f;
         }
         Err(e) => {
@@ -64,7 +67,7 @@ fn fetch(t: &mut Task, c: &mut CarddemoCommarea, acct_id: &[u8], view_style: boo
     match t.read("CUSTDAT", &cust_id, false) {
         Ok(r) => f.cust = Some(CustomerRecord::from_bytes(&r)),
         Err(e @ Resp::NotFnd) => {
-            f.msg = format!("CustId:{} not found in customer master.Resp: {:<10} REAS:{:<10}", text::s(&cust_id), format!("{:09}", e.code()), format!("{:09}", e.code2()));
+            f.msg = ret_msg(format!("CustId:{} not found in customer master.Resp: {:<10} REAS:{:<10}", text::s(&cust_id), format!("{:09}", e.code()), format!("{:09}", e.code2())));
         }
         Err(e) => f.msg = file_error("READ", "CUSTDAT", e, 12),
     }
@@ -111,7 +114,7 @@ pub fn coactvwc(t: &mut Task) -> Cr {
             c.set_cdemo_acct_id(&cc_acct);
         }
         if flg == Flg::Valid {
-            let f = fetch(t, &mut c, &cc_acct, true);
+            let f = fetch(t, &mut c, &cc_acct);
             if f.acct_not_ok {
                 flg = Flg::NotOk;
             }
@@ -710,7 +713,7 @@ fn acu_decide(t: &mut Task, s: &mut Acu, c: &mut CarddemoCommarea, aid: Aid) {
         if s.acct_flg == Flg::Valid {
             s.msg.clear();
             let key = if not_fetched { s.cc_acct.clone() } else { s.old.get("acct_id") };
-            let f = fetch(t, c, &key, false);
+            let f = fetch(t, c, &key);
             if f.acct_not_ok {
                 s.input_error = true;
                 s.acct_flg = Flg::NotOk;

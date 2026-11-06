@@ -15,8 +15,8 @@ all_groups = sorted(set(re.findall(r"^\| (FR-[A-Z]+(?:-[A-Z]+)?)-\d+", reqs_src,
 
 out = ["""---
 title: "CardDemo (Rust) — Manual Test Suite"
-subtitle: "Test cases derived from the Software Requirements Specification v1.1"
-date: "2026-11-05 — version 1.0"
+subtitle: "Test cases derived from the Software Requirements Specification v1.2"
+date: "2026-11-06 — version 1.1"
 author: "Prepared with Claude Code"
 toc: true
 toc-depth: 2
@@ -89,9 +89,23 @@ out.append(f"\n{len(CASES)} test cases, {sum(len(c[4]) for c in CASES)} steps; "
            f"{len(all_groups) - len(missing)} of {len(all_groups)} functional requirement groups covered.\n")
 
 out.append("\n# Execution log\n")
+log = None
+if os.path.exists(os.path.join(HERE, "results.json")):
+    import json
+    log = json.load(open(os.path.join(HERE, "results.json")))
+    res = log["results"]
+    passed = sum(1 for v in res.values() if v["result"] == "Pass")
+    out.append(f"Executed {log['date']} by {log['tester']}: the online and batch cases run through the same "
+               "3270 screen model the terminal UI uses (`carddemo-rs/crates/online/tests/manual_suite.rs`, one test "
+               "per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with "
+               f"`python3 docs/tests/execute.py`. **{passed} of {len(res)} passed.**\n")
 out.append("| Test case | Date | Tester | Result | Notes |\n|---|---|---|---|---|")
 for c in CASES:
-    out.append(f"| {c[0]} | | | | |")
+    if log and c[0] in log["results"]:
+        e = log["results"][c[0]]
+        out.append(f"| {c[0]} | {log['date']} | {log['tester']} | {e['result']} | {esc(e['notes'])} |")
+    else:
+        out.append(f"| {c[0]} | | | | |")
 
 md = os.path.join(HERE, "manual-test-suite.md")
 open(md, "w").write("\n".join(out) + "\n")

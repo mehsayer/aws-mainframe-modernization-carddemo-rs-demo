@@ -169,7 +169,9 @@ fn tl_enter(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut LSt) -> Cr {
         st.msg = "Invalid selection. Valid value is S".into();
         map.cursor("TRNIDIN");
     }
-    let mut key = TranRecord::new().tran_id().to_vec();
+    // TRAN-ID (WORKING-STORAGE, no VALUE) is binary zeros in a fresh task; a non-numeric search
+    // leaves it so, and the browse below starts at the lowest key
+    let mut key = vec![0u8; 16];
     if blank(map.get("TRNIDIN")) {
         key = vec![0u8; 16];
     } else if is_numeric(map.get("TRNIDIN"), false) {

@@ -1,7 +1,7 @@
 ---
 title: "CardDemo (Rust) — Manual Test Suite"
-subtitle: "Test cases derived from the Software Requirements Specification v1.1"
-date: "2026-11-05 — version 1.0"
+subtitle: "Test cases derived from the Software Requirements Specification v1.2"
+date: "2026-11-06 — version 1.1"
 author: "Prepared with Claude Code"
 toc: true
 toc-depth: 2
@@ -187,7 +187,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | Type `X` next to USER0001, Enter. | `Invalid selection. Valid values are U and D` |
+| 1 | Type `X` next to USER0001, Enter. | `You have reached the bottom of the page...`: with exactly 10 users the read-ahead hits end of file and its message replaces `Invalid selection. Valid values are U and D` (original behaviour). |
 | 2 | Type `u` next to USER0001, Enter. | Update User screen with USER0001 pre-filled and `Press PF5 key to save your updates ...` |
 
 ## TC-USR-05 — Add user: validation and duplicates
@@ -246,8 +246,8 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | Account `00000000001`, Enter. | Status `Y`, balance and limits in `+ZZZ,ZZZ,ZZZ.99` form (current balance 194.00), dates, customer name, SSN as `999-99-9999`, address, phones. |
-| 2 | Account `99999999999`, Enter. | `Account:99999999999 not found in Cross ref file. Resp:000000013 Reas:000000080` |
+| 1 | Account `00000000001`, Enter. | Status `Y`, balance and limits in `+ZZZ,ZZZ,ZZZ.99` form (current balance `+        194.00`), dates, customer name, SSN as `999-99-9999`, address, phones. |
+| 2 | Account `99999999999`, Enter. | `Account:99999999999 not found in Cross ref file.  Resp:000000013  Reas:0000` (two spaces before `Resp:` and `Reas:`; the message is cut at 75 characters). |
 | 3 | Press F3. | Main menu. |
 
 # Account update
@@ -289,7 +289,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 |--:|-----------------|---------------------------|
 | 1 | Fix FICO/State/Zip/Phones as in TC-ACU-02, Primary `Y`, Credit Limit `5000`, Enter. | Info `Changes validated.Press F5 to save`; all fields protected. |
 | 2 | Press F5. | Info `Changes committed to database`. |
-| 3 | Press Enter; then view account 00000000001 (option 1). | The empty search screen is shown; account view shows credit limit 5,000.00. |
+| 3 | Press Enter; then view account 00000000001 (option 1). | The empty search screen is shown; account view shows credit limit `+      5,000.00`. |
 
 # Card list
 
@@ -366,11 +366,11 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 ## TC-TRL-01 — Transaction list
 
 **Requirements:** FR-TRL-01..05  
-**Precondition:** Data reset (`carddemo reset`); signed on as USER0001 / PASSWORD (main menu shown)
+**Precondition:** Data reset (`carddemo reset`); signed on as USER0001 / PASSWORD (main menu shown); daily posting run (TC-BAT-01)
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | Option `6`. | 10 transactions per page, page `00000001`. Row 1 is the blank initialisation record from DALYTRAN.PS.INIT. |
+| 1 | Option `6`. | Page `00000001`. Row 1 is the initialisation record from DALYTRAN.PS.INIT (key X'00', shown blank). Ten rows per page. |
 | 2 | Search Tran ID `abc`, Enter. | `Tran ID must be Numeric ...` |
 | 3 | F8 / F7. | Next / previous page. |
 | 4 | `S` on row 2, Enter. | Transaction View with that transaction. |
@@ -414,7 +414,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | Option `8`, account `00000000001`, press F5. | Fields copied from the last transaction; `Confirm to add this transaction...` |
-| 2 | Confirm `Y`, Enter. | Green `Transaction added successfully.  Your Tran ID is <n>.`, where n = highest id + 1. |
+| 2 | Confirm `Y`, Enter. | Green `Transaction added successfully.  Your Tran ID is <n>.`, where n = highest id + 1 as 16 digits. |
 
 # Bill payment
 
@@ -479,7 +479,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | `carddemo job TRANBKP`, `carddemo job COMBTRAN`, `carddemo job CREASTMT`. | All RC=0000. |
-| 2 | Open `STATEMNT.PS` and `STATEMNT.HTML`. | One statement per card/account with name, address, balance, FICO, transaction lines and `Total EXP:`; the HTML shows the same as a table. |
+| 2 | Open `STATEMNT.PS` and `STATEMNT.HTML`. | One statement per card/account with name, address, balance, FICO, transaction lines and `Total EXP:`; the HTML shows name/address, basic details and the transactions as a table (it has no total line). |
 
 ## TC-BAT-04 — Transaction report
 
@@ -498,7 +498,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | `carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`. | Record dumps as described; READXREF prints each record twice; DALYVRFY reports unverifiable cards. |
+| 1 | `carddemo job READACCT` / `READCARD` / `READXREF` / `READCUST` / `DALYVRFY`. | Record dumps as described; READXREF and READCUST print each record twice; DALYVRFY shows card, account and customer for each of the 300 daily transactions, and once more for the last one after end of file (FR-BAT-VER-02); all cards verify with the sample data. |
 
 ## TC-BAT-06 — Export / import round trip
 
@@ -508,7 +508,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | `carddemo job CBEXPORT`. | `CBEXPORT: Total Records Exported:` = customers + accounts + xrefs + transactions + cards. |
-| 2 | `carddemo job CBIMPORT`. | `Unknown Record Types: 000000000`; the *.IMPORT data sets equal the master files byte for byte. |
+| 2 | `carddemo job CBIMPORT`. | `Errors Written: 000000000`, `Unknown Record Types: 000000000`; the *.IMPORT data sets equal the master files in every named field (FILLER bytes are X'00'). |
 
 ## TC-BAT-07 — Reload jobs and reset
 
@@ -519,6 +519,16 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 |--:|-----------------|---------------------------|
 | 1 | `carddemo job ACCTFILE` (and the other reload jobs). | The cluster is reloaded from the sample data. |
 | 2 | `time carddemo reset`. | Completes in well under a second. |
+
+## TC-BAT-08 — Differential test against the original COBOL
+
+**Requirements:** NFR-01, NFR-13, NFR-14, KD-12  
+**Precondition:** GnuCOBOL 3.x installed; `cargo build --release`
+
+| # | Action | Expected result |
+|--:|-----------------|---------------------------|
+| 1 | In `carddemo-rs`: `python3 difftest/run.py`. | Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`). |
+| 2 | Read the result table. | Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0. |
 
 # Requirements coverage
 
@@ -550,50 +560,53 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | FR-USR-LST | TC-USR-01, TC-USR-02, TC-USR-04 |
 | FR-USR-UPD | TC-USR-06 |
 
-40 test cases, 122 steps; 25 of 25 functional requirement groups covered.
+41 test cases, 124 steps; 25 of 25 functional requirement groups covered.
 
 
 # Execution log
 
+Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`carddemo-rs/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **41 of 41 passed.**
+
 | Test case | Date | Tester | Result | Notes |
 |---|---|---|---|---|
-| TC-SGN-01 | | | | |
-| TC-SGN-02 | | | | |
-| TC-SGN-03 | | | | |
-| TC-SGN-04 | | | | |
-| TC-SGN-05 | | | | |
-| TC-MEN-01 | | | | |
-| TC-MEN-02 | | | | |
-| TC-MEN-03 | | | | |
-| TC-MEN-04 | | | | |
-| TC-ADM-01 | | | | |
-| TC-USR-01 | | | | |
-| TC-USR-02 | | | | |
-| TC-USR-03 | | | | |
-| TC-USR-04 | | | | |
-| TC-USR-05 | | | | |
-| TC-USR-06 | | | | |
-| TC-USR-07 | | | | |
-| TC-ACV-01 | | | | |
-| TC-ACV-02 | | | | |
-| TC-ACU-01 | | | | |
-| TC-ACU-02 | | | | |
-| TC-ACU-03 | | | | |
-| TC-CDL-01 | | | | |
-| TC-CDL-02 | | | | |
-| TC-CDV-01 | | | | |
-| TC-CDV-02 | | | | |
-| TC-CDU-01 | | | | |
-| TC-TRL-01 | | | | |
-| TC-TRV-01 | | | | |
-| TC-TRA-01 | | | | |
-| TC-TRA-02 | | | | |
-| TC-BIL-01 | | | | |
-| TC-RPT-01 | | | | |
-| TC-BAT-01 | | | | |
-| TC-BAT-02 | | | | |
-| TC-BAT-03 | | | | |
-| TC-BAT-04 | | | | |
-| TC-BAT-05 | | | | |
-| TC-BAT-06 | | | | |
-| TC-BAT-07 | | | | |
+| TC-SGN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-SGN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-SGN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-SGN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-SGN-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-MEN-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-MEN-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-MEN-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-MEN-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ADM-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-USR-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ACV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ACV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ACU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ACU-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-ACU-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-CDL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-CDL-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-CDV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-CDV-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-CDU-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-TRL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-TRV-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-TRA-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-TRA-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BIL-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-RPT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-01 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-02 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-03 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-04 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-05 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
+| TC-BAT-08 | 2026-11-06 | Claude Code (scripted) | Pass | difftest/run.py: 40 comparisons, all identical |

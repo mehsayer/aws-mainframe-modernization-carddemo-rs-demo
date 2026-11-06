@@ -1,0 +1,170 @@
+{
+ "date": "2026-11-06",
+ "tester": "Claude Code (scripted)",
+ "results": {
+  "TC-SGN-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-SGN-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-SGN-03": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-SGN-04": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-SGN-05": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-MEN-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-MEN-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-MEN-03": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-MEN-04": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ADM-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-03": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-04": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-05": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-06": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-USR-07": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ACV-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ACV-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ACU-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ACU-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-ACU-03": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-CDL-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-CDL-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-CDV-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-CDV-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-CDU-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-TRL-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-TRV-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-TRA-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-TRA-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BIL-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-RPT-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-01": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-02": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-03": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-04": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-05": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-06": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-07": {
+   "result": "Pass",
+   "notes": "scripted terminal"
+  },
+  "TC-BAT-08": {
+   "result": "Pass",
+   "notes": "difftest/run.py: 40 comparisons, all identical"
+  }
+ }
+}
