@@ -49,6 +49,9 @@ pub struct Task<'a> {
     pub log: Vec<String>,
 }
 
+/// Consumer of the `JOBS` TD queue: receives the card images of one submitted job.
+pub type JobReader = Box<dyn Fn(&[Vec<u8>]) + Send + Sync>;
+
 impl<'a> Task<'a> {
     // ---- program control -------------------------------------------------
     pub fn xctl(&self, program: &str, commarea: Option<&[u8]>) -> Transfer {
@@ -97,7 +100,7 @@ impl<'a> Task<'a> {
         self.eibresp = r.as_ref().map_or_else(|e| e.code(), |_| 0);
         if update {
             if let Ok(rec) = &r {
-                let p = self.vsam.path(file.trim()).map_err(|e| e)?;
+                let p = self.vsam.path(file.trim())?;
                 self.held.insert(file.trim().to_string(), rec[p.ds.key_off..p.ds.key_off + p.ds.key_len].to_vec());
             }
         }
@@ -153,7 +156,7 @@ pub struct Region {
     pub applid: String,
     pub sysid: String,
     /// TD queue `JOBS` consumer (internal reader); receives each JCL deck submitted
-    pub on_job: Option<Box<dyn Fn(&[Vec<u8>]) + Send + Sync>>,
+    pub on_job: Option<JobReader>,
 }
 
 /// A terminal session (pseudo-conversation state).

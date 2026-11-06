@@ -27,7 +27,7 @@ fn xset(ca: &mut [u8], f: (usize, usize), v: &[u8]) {
 }
 
 /// RETURN-TO-PREV-SCREEN (common to the four programs)
-fn return_to_prev(t: &Task, ca: &mut Vec<u8>, tran: &str, pgm: &str) -> cics::Transfer {
+fn return_to_prev(t: &Task, ca: &mut [u8], tran: &str, pgm: &str) -> cics::Transfer {
     let mut c = cdemo(ca);
     if blank(c.cdemo_to_program()) {
         c.set_cdemo_to_program(b"COSGN00C");
@@ -114,7 +114,7 @@ fn send_list(t: &mut Task, map: &mut Map, st: &ListState) {
     t.send_map(map, st.erase);
 }
 
-fn list_enter(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState) -> Cr {
+fn list_enter(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut ListState) -> Cr {
     // first row with a selection code wins
     let mut sel_flg = b" ".to_vec();
     let mut selected = vec![b' '; 8];
@@ -158,7 +158,7 @@ fn list_enter(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState)
     Ok(())
 }
 
-fn list_pf7(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState) -> Cr {
+fn list_pf7(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut ListState) -> Cr {
     let first = xget(ca, X_FIRST);
     let key = if blank(&first) { vec![0u8; 8] } else { first };
     xset(ca, X_NEXT, b"Y");
@@ -173,7 +173,7 @@ fn list_pf7(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState) -
     Ok(())
 }
 
-fn list_pf8(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState) -> Cr {
+fn list_pf8(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut ListState) -> Cr {
     let last = xget(ca, X_LAST);
     let key = if blank(&last) { vec![0xFFu8; 8] } else { last };
     map.cursor("USRIDIN");
@@ -273,7 +273,7 @@ fn init_rows(map: &mut Map) {
     }
 }
 
-fn page_forward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState, key: Vec<u8>) -> Cr {
+fn page_forward(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut ListState, key: Vec<u8>) -> Cr {
     let mut br = startbr(t, map, st, &key);
     if st.err {
         return Ok(());
@@ -308,7 +308,7 @@ fn page_forward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListStat
     Ok(())
 }
 
-fn page_backward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut ListState, key: Vec<u8>) -> Cr {
+fn page_backward(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut ListState, key: Vec<u8>) -> Cr {
     let mut br = startbr(t, map, st, &key);
     if st.err {
         return Ok(());

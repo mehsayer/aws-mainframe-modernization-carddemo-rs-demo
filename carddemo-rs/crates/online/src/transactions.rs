@@ -142,7 +142,7 @@ fn set_page(ca: &mut [u8], n: u64) {
     xset(ca, X_PAGE, format!("{:08}", n % 100_000_000).as_bytes());
 }
 
-fn tl_enter(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut LSt) -> Cr {
+fn tl_enter(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut LSt) -> Cr {
     let mut flg = b" ".to_vec();
     let mut sel = vec![b' '; 16];
     for i in 1..=10 {
@@ -261,7 +261,7 @@ fn endbr(t: &Task, br: Option<Browse>) -> Cr {
     if br.is_some() { Ok(()) } else { Err(t.abend("AEIP")) }
 }
 
-fn tl_forward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut LSt, key: Vec<u8>) -> Cr {
+fn tl_forward(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut LSt, key: Vec<u8>) -> Cr {
     let mut br = tl_startbr(t, map, st, &key);
     if st.err {
         return Ok(());
@@ -298,7 +298,7 @@ fn tl_forward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut LSt, key: 
     Ok(())
 }
 
-fn tl_backward(t: &mut Task, ca: &mut Vec<u8>, map: &mut Map, st: &mut LSt, key: Vec<u8>) -> Cr {
+fn tl_backward(t: &mut Task, ca: &mut [u8], map: &mut Map, st: &mut LSt, key: Vec<u8>) -> Cr {
     let mut br = tl_startbr(t, map, st, &key);
     if st.err {
         return Ok(());

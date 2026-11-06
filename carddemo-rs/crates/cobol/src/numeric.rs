@@ -38,6 +38,7 @@ impl Pic {
         Pic { digits, scale, signed, usage: Usage::Binary }
     }
     /// Storage length in bytes.
+    #[allow(clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         match self.usage {
             Usage::Display => self.digits as usize,
@@ -80,7 +81,6 @@ pub fn fit(v: Dec, pic: Pic) -> Dec {
     if v.is_zero() {
         v = Dec::ZERO;
     }
-    let mut v = v;
     v.rescale(pic.scale);
     v
 }

@@ -48,7 +48,7 @@ pub fn edit(v: Dec, pic: &str) -> String {
     let digits: Vec<char> = s.chars().skip(s.len() - ndig).collect();
 
     let all_z = sym.iter().all(|&c| !matches!(c, '9')) && !floating;
-    if all_z && unscaled == 0 && sym.iter().any(|&c| c == 'Z') {
+    if all_z && unscaled == 0 && sym.contains(&'Z') {
         return " ".repeat(sym.len());
     }
 

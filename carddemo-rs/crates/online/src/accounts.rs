@@ -492,6 +492,7 @@ fn compare_old_new(s: &Acu) -> bool {
 }
 
 /// CSUTLDPY EDIT-DATE-CCYYMMDD (+ EDIT-DATE-OF-BIRTH when `dob`).
+#[allow(clippy::too_many_arguments)] // mirrors the copybook's parameters (field names + keys)
 fn edit_date(s: &mut Acu, name: &str, fy: &'static str, fm: &'static str, fd: &'static str, ky: &str, km: &str, kd: &str, dob: bool) {
     let (y, m, d) = (s.nv(ky), s.nv(km), s.nv(kd));
     let mut parts_ok = [true, true, true];
@@ -539,8 +540,8 @@ fn edit_date(s: &mut Acu, name: &str, fy: &'static str, fm: &'static str, fd: &'
     }
     if mv == 2 && dv == 29 {
         let yv: u32 = text::s(&y).parse().unwrap_or(0);
-        let div = if yv % 100 == 0 { 400 } else { 4 };
-        if yv % div != 0 {
+        let div = if yv.is_multiple_of(100) { 400 } else { 4 };
+        if !yv.is_multiple_of(div) {
             s.err(fd, b'0', format!("{name}:Not a leap year.Cannot have 29 days in this month."));
             s.bad.entry(fm).or_insert(b'0');
             s.bad.entry(fy).or_insert(b'0');

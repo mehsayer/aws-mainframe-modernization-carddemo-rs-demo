@@ -156,7 +156,7 @@ pub fn run(ctx: &mut StepCtx) -> StepResult {
                 hdr.set_rept_end_date(&end);
                 rpt.headers(ctx, &hdr)?;
             }
-            if rpt.line_counter % PAGE_SIZE == 0 {
+            if rpt.line_counter.is_multiple_of(PAGE_SIZE) {
                 rpt.page_totals(ctx)?;
                 rpt.headers(ctx, &hdr)?;
             }

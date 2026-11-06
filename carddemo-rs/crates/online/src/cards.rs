@@ -207,7 +207,7 @@ pub fn cocrdlic(t: &mut Task) -> Cr {
     let selected = |s: &Lic, ch: u8| s.i_selected >= 1 && s.select[s.i_selected - 1] == ch;
     if s.input_error {
         if s.acct_flg != Flg::NotOk && s.card_flg != Flg::NotOk {
-            lic_forward(t, &mut s, &vec![b' '; 16]);
+            lic_forward(t, &mut s, &[b' '; 16]);
         }
         lic_send(t, &mut s, &c, &mut map, aid);
     } else if aid == Aid::Pf(7) && first_page {
