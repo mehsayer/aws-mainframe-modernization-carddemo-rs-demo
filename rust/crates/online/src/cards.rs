@@ -1257,7 +1257,8 @@ fn upd_send(t: &mut Task, s: &mut Upd, c: &CarddemoCommarea, map: &mut Map) {
             }
         }
     }
-    let cursor = if s.found || s.no_change {
+    // FOUND-CARDS-FOR-ACCOUNT is an 88 on WS-INFO-MSG: true only while that is the info message
+    let cursor = if s.info == "Details of selected card shown above" || s.no_change {
         "CRDNAME"
     } else if matches!(s.acct, Flg::NotOk | Flg::Blank) {
         "ACCTSID"

@@ -237,9 +237,11 @@ fn tl_read(t: &mut Task, map: &mut Map, st: &mut LSt, br: &mut Option<Browse>, f
 
 fn tl_populate(map: &mut Map, ca: &mut [u8], idx: usize, tr: &TranRecord) {
     let ts = tr.tran_orig_ts();
-    let date = format!("{}/{}/{}", text::s(&ts[5..7]), text::s(&ts[8..10]), text::s(&ts[2..4]));
+    // WS-CURDATE-MM-DD-YY: the timestamp bytes are moved as they are (an X'00' record gives NULs, and a
+    // field starting with X'00' is not transmitted)
+    let date = [&ts[5..7], b"/", &ts[8..10], b"/", &ts[2..4]].concat();
     map.set(&format!("TRNID{idx:02}"), tr.tran_id());
-    map.set_str(&format!("TDATE{idx:02}"), &date);
+    map.set(&format!("TDATE{idx:02}"), &date);
     map.set(&format!("TDESC{idx:02}"), tr.tran_desc());
     map.set_str(&format!("TAMT{idx:03}"), &edit(tr.tran_amt_n(), "+99999999.99"));
     if idx == 1 {

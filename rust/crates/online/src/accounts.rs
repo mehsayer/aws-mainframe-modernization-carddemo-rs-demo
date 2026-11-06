@@ -23,6 +23,9 @@ struct Fetched {
     acct_not_ok: bool,
 }
 
+/// 88 ACUP-CHANGES-MADE
+const ACUP_CHANGES_MADE: &[u8] = b"ENCLF";
+
 /// ACCT-UPDATE-RECORD (COACTUPC): group id at offset 102, FILLER from 112 (see KD-13).
 const ACCT_UPDATE_GROUP: usize = 102;
 const ACCT_UPDATE_FILLER: usize = 112;
@@ -948,8 +951,14 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
         }
     }
     map.attr("INFOMSG", if info.is_empty() { AttrByte::Dark } else { AttrByte::Bright });
+    // 3390-SETUP-INFOMSG-ATTRS: F12 shown once changes were made (not after they are done); F5 and F12
+    // shown while asking for confirmation. DFHBMASB = autoskip, bright.
+    if ACUP_CHANGES_MADE.contains(&s.action) && s.action != b'C' {
+        map.attr("FKEY12", AttrByte::AskipBright);
+    }
     if s.action == b'N' {
-        map.attr("FKEYS", AttrByte::Bright);
+        map.attr("FKEY05", AttrByte::AskipBright);
+        map.attr("FKEY12", AttrByte::AskipBright);
     }
     t.send_map(map, true);
 }

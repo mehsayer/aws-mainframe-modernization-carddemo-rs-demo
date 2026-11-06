@@ -70,7 +70,8 @@ pub fn cosgn00c(t: &mut Task) -> Cr {
             }
             Aid::Pf(3) => {
                 // SEND-PLAIN-TEXT then RETURN (no transid)
-                t.send_text(CCDA_MSG_THANK_YOU.as_bytes());
+                // MOVE CCDA-MSG-THANK-YOU TO WS-MESSAGE (X(80)); SEND TEXT FROM(WS-MESSAGE) LENGTH(80)
+                t.send_text(format!("{CCDA_MSG_THANK_YOU:<80}").as_bytes());
                 return Err(t.ret(None, None));
             }
             _ => {
