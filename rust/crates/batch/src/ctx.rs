@@ -2,7 +2,6 @@
 //! sequential data sets and GDG generations as files), SYSOUT, PARM and clock.
 
 use crate::seqfile::Format;
-use chrono::NaiveDateTime;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,18 +31,8 @@ pub enum Dd {
     Instream(Vec<Vec<u8>>),
 }
 
-/// Clock used for FUNCTION CURRENT-DATE etc. Overridable for reproducible runs
-/// (env `CARDDEMO_NOW=YYYY-MM-DDTHH:MM:SS[.ff]`).
-pub fn now() -> NaiveDateTime {
-    if let Ok(s) = std::env::var("CARDDEMO_NOW") {
-        for f in ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S"] {
-            if let Ok(t) = NaiveDateTime::parse_from_str(&s, f) {
-                return t;
-            }
-        }
-    }
-    chrono::Local::now().naive_local()
-}
+/// Clock used for FUNCTION CURRENT-DATE etc. (env `CARDDEMO_NOW` freezes it).
+pub use cobol::clock::now;
 
 /// FUNCTION CURRENT-DATE (first 16 chars used by CardDemo: YYYYMMDDHHMMSScc).
 pub fn current_date() -> String {

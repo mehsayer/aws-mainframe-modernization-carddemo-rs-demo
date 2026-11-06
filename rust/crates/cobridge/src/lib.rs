@@ -114,6 +114,10 @@ pub fn set_sysout(path: &std::path::Path) -> std::io::Result<()> {
 /// them back even when libcob ends the process from inside a program call.
 static SAVED_FDS: [AtomicI32; 2] = [AtomicI32::new(-1), AtomicI32::new(-1)];
 
+/// Number of active redirects: only the outermost one redirects and
+/// restores, so a nested or overlapping call never saves the sysout file as the "original" stdout.
+static REDIRECT_DEPTH: Mutex<usize> = Mutex::new(0);
+
 /// stdout/stderr redirected to the sysout file for the duration of one program call.
 struct SysoutRedirect;
 
@@ -122,6 +126,11 @@ impl SysoutRedirect {
         use std::os::fd::AsRawFd;
         let guard = SYSOUT.lock().unwrap_or_else(|e| e.into_inner());
         let fd = guard.as_ref()?.as_raw_fd();
+        let mut depth = REDIRECT_DEPTH.lock().unwrap_or_else(|e| e.into_inner());
+        if *depth > 0 {
+            *depth += 1;
+            return Some(SysoutRedirect);
+        }
         unsafe {
             fflush(std::ptr::null_mut());
             let (out, err) = (dup(1), dup(2));
@@ -138,14 +147,19 @@ impl SysoutRedirect {
             SAVED_FDS[1].store(err, Ordering::SeqCst);
             dup2(fd, 1);
             dup2(fd, 2);
-            Some(SysoutRedirect)
         }
+        *depth = 1;
+        Some(SysoutRedirect)
     }
 }
 
 impl Drop for SysoutRedirect {
     fn drop(&mut self) {
-        restore_stdio();
+        let mut depth = REDIRECT_DEPTH.lock().unwrap_or_else(|e| e.into_inner());
+        *depth = depth.saturating_sub(1);
+        if *depth == 0 {
+            restore_stdio();
+        }
     }
 }
 
@@ -182,7 +196,8 @@ const EIB_LEN: usize = 75;
 /// the current directory), else the build output. Same rule as `modules_dir()` in cobridge/cicsprep.py.
 pub fn modules_dir() -> PathBuf {
     match std::env::var_os("CARDDEMO_COBOL_MODULES").filter(|v| !v.is_empty()) {
-        Some(v) => std::path::absolute(PathBuf::from(v)).unwrap_or_default(),
+        // check() reports a failure here (current directory gone); keep the value as given meanwhile
+        Some(v) => std::path::absolute(PathBuf::from(&v)).unwrap_or_else(|_| PathBuf::from(v)),
         None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cobridge/build/modules"),
     }
 }
@@ -194,6 +209,10 @@ pub fn available() -> bool {
 
 /// Everything needed to run the COBOL programs: the modules and the GnuCOBOL runtime.
 pub fn check() -> Result<(), String> {
+    if let Some(v) = std::env::var_os("CARDDEMO_COBOL_MODULES").filter(|v| !v.is_empty()) {
+        std::path::absolute(PathBuf::from(&v))
+            .map_err(|e| format!("CARDDEMO_COBOL_MODULES={}: cannot make it absolute: {e}", v.to_string_lossy()))?;
+    }
     if !available() {
         return Err(format!(
             "COBOL modules not built in {}: run  python3 rust/cobridge/cicsprep.py  (needs GnuCOBOL)",
@@ -270,6 +289,7 @@ fn pack7(v: u32) -> [u8; 4] {
 /// Run one original COBOL program for the current task (Region calls this like a Rust program).
 pub fn run(t: &mut Task) -> Cr {
     init();
+    quiet_panic_hook();
     let name = CString::new(t.program.trim()).expect("program name");
     if unsafe { (cob().resolve)(name.as_ptr()) }.is_null() {
         return Err(Transfer::Abend("APCT".into()));
@@ -443,8 +463,45 @@ fn cond_abend(resp: i32) -> String {
     .to_string()
 }
 
-/// The `CDCICS` entry point called by the translated COBOL programs.
+thread_local! {
+    /// True while this thread runs a `CDCICS` call (see [`quiet_panic_hook`]).
+    static IN_CDCICS: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Wrap the panic hook once: a panic inside a `CDCICS` call becomes an ASRA abend, so the hook only
+/// logs it (stderr is the sysout file then) instead of running the previous hook, which in the TUI is
+/// ratatui's: it would restore the terminal while the UI keeps running. Installed on the first program
+/// call, i.e. after the TUI has set up its own hook.
+fn quiet_panic_hook() {
+    static HOOK: Once = Once::new();
+    HOOK.call_once(|| {
+        let prev = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if IN_CDCICS.with(|c| c.get()) {
+                eprintln!("cobridge: EXEC CICS command failed (ASRA): {info}");
+            } else {
+                prev(info);
+            }
+        }));
+    });
+}
+
+/// The `CDCICS` entry point called by the translated COBOL programs. A panic must not unwind into
+/// libcob (that aborts the process with the terminal in raw mode): it ends the task with ASRA.
 extern "C" fn cdcics() -> c_int {
+    let was = IN_CDCICS.with(|c| c.replace(true));
+    let rc = std::panic::catch_unwind(cdcics_call).unwrap_or_else(|_| {
+        let ctx = CTX.with(|c| c.get());
+        if ctx.is_null() {
+            return RC_TRANSFER;
+        }
+        abend(unsafe { &mut *ctx }, "ASRA".into())
+    });
+    IN_CDCICS.with(|c| c.set(was));
+    rc
+}
+
+fn cdcics_call() -> c_int {
     let ctx = CTX.with(|c| c.get());
     if ctx.is_null() {
         return RC_TRANSFER;
@@ -452,14 +509,10 @@ extern "C" fn cdcics() -> c_int {
     let ctx = unsafe { &mut *ctx };
     let t = unsafe { &mut *ctx.task };
     let eib = unsafe { param_bytes(1) };
-    let pieces: usize = unsafe { cobol::text::s(param_bytes(2)) }.trim()[1..].parse().unwrap_or(1);
+    let pieces: usize = unsafe { cobol::text::s(param_bytes(2)) }.trim().get(1..).and_then(|n| n.parse().ok()).unwrap_or(1);
     let desc: String = (0..pieces).map(|i| unsafe { cobol::text::s(param_bytes(3 + i as c_int)) }).collect();
     let cmd = Cmd::parse(&desc, 3 + pieces as c_int);
-    // a panic must not unwind into libcob (it would abort the process with the terminal in raw mode)
-    let out = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(ctx, t, &cmd))) {
-        Ok(o) => o,
-        Err(_) => Out::Transfer(Transfer::Abend("ASRA".into())),
-    };
+    let out = execute(ctx, t, &cmd);
     let (resp, resp2) = match &out {
         Out::Cond(r, r2) => (*r, *r2),
         _ => (0, 0),
@@ -739,31 +792,37 @@ fn receive_map(t: &mut Task, c: &Cmd) -> Out {
 
 #[cfg(test)]
 mod tests {
+    // The only test in this binary: it redirects the whole process's fd 1, so nothing else may print
+    // meanwhile (modules_dir() is tested in tests/modules_dir.rs).
     use super::*;
+
+    /// Device and inode of fd 1: which file it really points at.
+    fn stdout_id() -> (u64, u64) {
+        let mut st: libc::stat = unsafe { std::mem::zeroed() };
+        assert_eq!(unsafe { libc::fstat(1, &mut st) }, 0);
+        (st.st_dev as u64, st.st_ino as u64)
+    }
 
     #[test]
     fn restore_stdio_undoes_an_active_redirect() {
         let log = std::env::temp_dir().join(format!("cobridge-unit-{}.log", std::process::id()));
         let _ = std::fs::remove_file(&log);
         set_sysout(&log).unwrap();
-        let before = unsafe { libc::fcntl(1, libc::F_GETFD) };
+        let before = stdout_id();
         let r = SysoutRedirect::start().expect("redirect");
+        assert_ne!(stdout_id(), before, "fd 1 redirected");
+        let nested = SysoutRedirect::start().expect("nested redirect");
+        drop(nested); // an inner call ending leaves the outer redirect in place
+        assert_ne!(stdout_id(), before, "still redirected after the nested call");
         unsafe { libc::write(1, b"inside\n".as_ptr().cast(), 7) };
         restore_stdio(); // what the exit handler does while a call is still running
+        assert_eq!(stdout_id(), before, "fd 1 back on the original file");
         drop(r); // and the normal end of the call afterwards must not break anything
-        assert_eq!(unsafe { libc::fcntl(1, libc::F_GETFD) }, before);
+        assert_eq!(stdout_id(), before);
         assert!(SAVED_FDS.iter().all(|s| s.load(Ordering::SeqCst) == -1));
+        assert_eq!(*REDIRECT_DEPTH.lock().unwrap(), 0);
         assert_eq!(std::fs::read_to_string(&log).unwrap(), "inside\n");
         *SYSOUT.lock().unwrap() = None;
-    }
-
-    #[test]
-    fn modules_dir_rule() {
-        // an empty value means "not set", like the Python side
-        std::env::set_var("CARDDEMO_COBOL_MODULES", "");
-        assert!(modules_dir().ends_with("cobridge/build/modules"));
-        std::env::set_var("CARDDEMO_COBOL_MODULES", "rel/mods");
-        assert!(modules_dir().is_absolute() && modules_dir().ends_with("rel/mods"));
-        std::env::remove_var("CARDDEMO_COBOL_MODULES");
+        let _ = std::fs::remove_file(&log);
     }
 }

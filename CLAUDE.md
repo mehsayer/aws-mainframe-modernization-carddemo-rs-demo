@@ -49,7 +49,8 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   task; reproduce the order exactly. One Rust function per COBOL paragraph, named after it.
 - **STRING INTO a shorter field truncates** (e.g. WS-RETURN-MSG is 75 bytes, the screen field 78).
 - Every behaviour change must keep `rust/difftest/run.py` at "all outputs identical", `rust/difftest/online.py`
-  at "all screens identical" and the manual suite at 42/42. If a test-case text disagrees with the COBOL, the
+  at "all screens identical" and the manual suite at "41 of 42 passed" plus TC-DIF-01 "Pass (step 2)" (its step 1
+  is an interactive session, never scripted). If a test-case text disagrees with the COBOL, the
   COBOL wins: fix the case text. The online tests can run on the original programs, so check doubtful
   behaviour there instead of guessing.
 - **CICS gives each task fresh WORKING-STORAGE**; the bridge CANCELs every COBOL program after its task.

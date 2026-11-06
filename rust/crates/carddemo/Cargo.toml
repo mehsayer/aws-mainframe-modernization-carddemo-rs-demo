@@ -15,6 +15,7 @@ clap.workspace = true
 ratatui.workspace = true
 crossterm.workspace = true
 chrono.workspace = true
+libc.workspace = true
 # `carddemo online --cobol`: the original COBOL programs on the CICS bridge. libcob is loaded at run
 # time, so building needs no GnuCOBOL; only `--cobol` does.
 cobridge = { path = "../cobridge" }

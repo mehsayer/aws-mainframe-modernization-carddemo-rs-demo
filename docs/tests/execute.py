@@ -23,12 +23,20 @@ RESULTS = os.path.join(RS, "difftest", "out-online", "results.json")
 
 
 def run_online(*args):
-    """online.py clears its output first, so results.json exists only if this run produced it."""
+    """Run online.py; its results.json, or None if this run did not write one. online.py writes results.json
+    last (also when screens differ, with exit code 1), and an earlier run's file is removed first, so a file
+    found afterwards is this run's."""
+    if os.path.exists(RESULTS):
+        os.remove(RESULTS)
     r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
     if not os.path.exists(RESULTS):
-        sys.stderr.write(f"online.py {' '.join(args)} did not complete:\n{r.stderr[-2000:]}\n")
+        sys.stderr.write(f"online.py {' '.join(args)} did not complete (exit code {r.returncode}):\n{r.stderr[-2000:]}\n")
         return None
-    return json.load(open(RESULTS))
+    res = json.load(open(RESULTS))
+    if r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok")):
+        sys.stderr.write(f"online.py {' '.join(args)}: exit code {r.returncode} does not match its results:\n{r.stderr[-2000:]}\n")
+        return None
+    return res
 
 
 online = run_online()

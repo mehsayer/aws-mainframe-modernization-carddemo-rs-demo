@@ -52,7 +52,7 @@ header-includes:
 
 - All **30 programs** translated, working and tested
 - **40 of 40** batch outputs and **338 of 338** screens identical to the original
-- **42 of 42** test cases passed
+- **41 of 42** test cases passed, the last one's automated part too
 - **15 defects** found in the original and documented
 - About **3 hours** of AI working time, one engineer supervising
 ::::
@@ -181,7 +181,7 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 | Programs translated | 30 / 30 |
 | Batch outputs vs. COBOL | 40 / 40 identical |
 | Screens vs. COBOL | 338 / 338 identical |
-| Manual test cases | 42 / 42 passed |
+| Manual test cases | 41 / 42 + 1 (step 2) |
 | Defects found in the original | 15 |
 | AI working time | ≈ 3.1 h |
 ::::

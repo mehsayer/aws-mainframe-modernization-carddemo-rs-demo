@@ -106,7 +106,8 @@ def rust_only():
 
 
 def main():
-    shutil.rmtree(OUT, ignore_errors=True)  # never leave an earlier run's results behind
+    if OUT.exists():
+        shutil.rmtree(OUT)  # never leave an earlier run's results behind (fails loudly if it cannot)
     OUT.mkdir(parents=True)
     if "--rust-only" in sys.argv:
         rust_only()
@@ -121,6 +122,7 @@ def main():
             d = OUT / target / region
             d.mkdir(parents=True)
             res[region] = run(target, region, d)
+        # one <test name>.log per test (tests/common log_screen); the COBOL sysout file is cobol-sysout.txt
         tests = sorted({p.name for p in (OUT / target / "rust").glob("*.log")} | {p.name for p in (OUT / target / "cobol").glob("*.log")})
         t_same = 0
         for name in tests:

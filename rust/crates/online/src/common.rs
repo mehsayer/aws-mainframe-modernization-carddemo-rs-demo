@@ -1,7 +1,7 @@
 //! Shared copybooks of the online programs: COTTL01Y (titles), CSMSG01Y (messages),
 //! CSDAT01Y (date/time), COCOM01Y (commarea) helpers and POPULATE-HEADER-INFO.
 
-use chrono::{NaiveDateTime, Timelike};
+use chrono::Timelike;
 use cics::Map;
 use cobol::copybooks::CarddemoCommarea;
 
@@ -11,15 +11,7 @@ pub const CCDA_MSG_THANK_YOU: &str = "Thank you for using CardDemo application..
 pub const CCDA_MSG_INVALID_KEY: &str = "Invalid key pressed. Please see below...         ";
 
 /// Clock (FUNCTION CURRENT-DATE / ASKTIME); `CARDDEMO_NOW` overrides it for tests.
-pub fn now() -> NaiveDateTime {
-    fixed_now().unwrap_or_else(|| chrono::Local::now().naive_local())
-}
-
-/// The test clock: `CARDDEMO_NOW` when it is set and valid (`YYYY-MM-DDTHH:MM:SS[.ff]`), else None.
-pub fn fixed_now() -> Option<NaiveDateTime> {
-    let s = std::env::var("CARDDEMO_NOW").ok()?;
-    ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S"].iter().find_map(|f| NaiveDateTime::parse_from_str(&s, f).ok())
-}
+pub use cobol::clock::{fixed_now, now};
 
 /// POPULATE-HEADER-INFO
 pub fn header(map: &mut Map, tranid: &str, pgm: &str) {

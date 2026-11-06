@@ -1,4 +1,5 @@
 //! COBOL data semantics for the CardDemo Rust port.
+pub mod clock;
 pub mod copybooks;
 pub mod ebcdic;
 pub mod edit;

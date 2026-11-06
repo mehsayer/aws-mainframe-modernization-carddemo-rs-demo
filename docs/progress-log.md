@@ -113,3 +113,18 @@ Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.
 - COBOL DISPLAY output in test runs goes to a sysout file; online.py's parser is the plain one, clears old
   results first, and has `--rust-only`; execute.py uses it as the single fallback; the suite summary reads
   "41 of 42 passed" plus the partly manual TC-DIF-01.
+
+### Code review (2026-11-06, second `/code-review xhigh`): all 14 findings fixed
+- A panic inside an EXEC CICS call no longer runs ratatui's panic hook (which restored the terminal while the UI
+  kept running): the bridge wraps the hook once and only logs such panics to the sysout file; the whole CDCICS
+  body is inside the catch, so no panic can cross into libcob.
+- The sysout redirect is re-entrant (depth counter; only the outermost call saves and restores the descriptors).
+- Online tests write the COBOL sysout to `cobol-sysout.txt`, so online.py no longer counts it as a test
+  (manual_suite 34, signon 2 again); online.py fails loudly if it cannot clear its output; execute.py removes an
+  old results.json first and checks online.py's exit code.
+- Unit tests: the stdout redirect test is alone in its binary and compares device/inode; the module-directory
+  test is a separate test binary and restores CARDDEMO_COBOL_MODULES.
+- `check()` reports an unusable CARDDEMO_COBOL_MODULES; when libcob ends the process under the TUI, the exit
+  handler names the sysout file; one clock (`cobol::clock`) for batch, online and the bridge; libc is a
+  workspace dependency.
+- Gate in CLAUDE.md and the deck: the manual suite reads "41 of 42 passed" plus TC-DIF-01 "Pass (step 2)".
