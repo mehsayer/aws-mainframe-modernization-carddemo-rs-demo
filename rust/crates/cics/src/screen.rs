@@ -19,6 +19,10 @@ pub enum AttrByte {
     Bright,
     /// DFHBMASK: autoskip
     Askip,
+    /// DFHBMASB: autoskip, bright
+    AskipBright,
+    /// DFHBMUNP: unprotected
+    Unprot,
 }
 
 impl AttrByte {
@@ -52,6 +56,18 @@ impl AttrByte {
             AttrByte::Askip => {
                 a.protected = true;
                 a.askip = true
+            }
+            AttrByte::AskipBright => {
+                a.protected = true;
+                a.askip = true;
+                a.bright = true;
+                a.dark = false
+            }
+            AttrByte::Unprot => {
+                a.protected = false;
+                a.askip = false;
+                a.fset = false;
+                a.dark = false
             }
         }
         a

@@ -1,0 +1,16 @@
+[package]
+name = "cobridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Runs the original CardDemo COBOL online programs (GnuCOBOL) on the Rust CICS runtime"
+
+[dependencies]
+cobol.workspace = true
+vsam.workspace = true
+cics.workspace = true
+online.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+batch.workspace = true
