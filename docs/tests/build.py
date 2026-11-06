@@ -54,7 +54,8 @@ for c in CASES:
 titles = {"SGN": "Sign-on", "MEN": "Main menu", "ADM": "Admin menu", "USR": "User administration",
           "ACV": "Account view", "ACU": "Account update", "CDL": "Card list", "CDV": "Card detail",
           "CDU": "Card update", "TRL": "Transaction list", "TRV": "Transaction view", "TRA": "Transaction add",
-          "BIL": "Bill payment", "RPT": "Reports", "BAT": "Batch"}
+          "BIL": "Bill payment", "RPT": "Reports", "BAT": "Batch",
+          "DIF": "Comparison with the original"}
 for g, cs in groups.items():
     out.append(f"\n# {titles.get(g, g)}\n")
     for cid, title, reqs, pre, steps in cs:

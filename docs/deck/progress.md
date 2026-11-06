@@ -51,10 +51,10 @@ header-includes:
 \colhead{What we got}
 
 - All **30 programs** translated, working and tested
-- **40 of 40** output comparisons identical to the original
-- **41 of 41** test cases passed
-- **12 defects** found in the original and documented
-- About **2.5 hours** of AI working time, one engineer supervising
+- **40 of 40** batch outputs and **338 of 338** screens identical to the original
+- **42 of 42** test cases passed
+- **15 defects** found in the original and documented
+- About **3 hours** of AI working time, one engineer supervising
 ::::
 :::
 
@@ -179,11 +179,11 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 | Measure | Result |
 |----------------------|----------:|
 | Programs translated | 30 / 30 |
-| Comparisons vs. COBOL | 40 / 40 identical |
-| Manual test cases | 41 / 41 passed |
-| Automated test suites | 21, all passing |
-| Defects found in the original | 12 |
-| AI working time | ≈ 2.4 h |
+| Batch outputs vs. COBOL | 40 / 40 identical |
+| Screens vs. COBOL | 338 / 338 identical |
+| Manual test cases | 42 / 42 passed |
+| Defects found in the original | 15 |
+| AI working time | ≈ 3.1 h |
 ::::
 :::: {.column width="48%"}
 \colhead{Documents produced by the AI}
@@ -206,11 +206,11 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 | Customer statements | 50 statements, text and web version (7,900 lines) | ✓ identical |
 | Data export / import | migration file, re-imported files, error file | ✓ identical |
 | File print utilities | 5 programs, incl. packed-decimal outputs | ✓ identical |
+| **Online screens** | 338 screens of 49 scripted terminal sessions: every field, colour, cursor | ✓ identical |
 
-The original COBOL is compiled with a free COBOL compiler and run **on the same data, with the same
-clock**. Anyone can repeat the check with one command (see the live demo).
+Original COBOL (free compiler) and Rust run on **the same data, clock and keystrokes**; one command each repeats the checks.
 
-## Next: the original online screens, live
+## The original online screens, live
 
 \begin{center}
 \begin{tikzpicture}[node distance=5mm and 6mm, every node/.style={font=\footnotesize, align=center},
@@ -231,8 +231,9 @@ clock**. Anyone can repeat the check with one command (see the live demo).
 
 - Real CICS runs only on licensed mainframes: the original programs get a **stand-in for CICS**, the layer
   the Rust version already uses. Both runs share it, so the comparison checks the business logic
-- Result: old and new screens **side by side**, and an **automated online comparison**
-- First check done: all 17 original screen programs compile unchanged with the free compiler
+- All 17 original screen programs run **unchanged**; old and new screens can be shown **side by side**
+- Automated comparison: **338 of 338 screens identical**; on the way it found 13 differences in the Rust
+  port (all fixed) and 3 more defects of the original (documented)
 
 ## Why not run it on an emulated mainframe?
 
@@ -274,16 +275,17 @@ Kept and documented as *known defects*:
 - Card update wipes the security code
 - Account update moves the group id
 - Two programs do not compile
-- ... 12 in total
+- ... 15 in total
 ::::
 :::: {.column width="48%"}
 \colhead{In its own translation}
 
 Found by running the original, and fixed:
 
-- 9 subtle differences, none visible in normal tests
-- 8 test-case texts corrected
-- An AI **code review**, scoped by `CLAUDE.md` to the Rust code: 10 more issues, all fixed
+- Batch comparison: 9 subtle differences
+- AI **code review** (scoped by `CLAUDE.md`): 10 issues
+- Online comparison: 13 differences
+- All fixed; none was visible in normal tests
 ::::
 :::
 
@@ -350,8 +352,9 @@ Review only rust/.
 |------|------------------------------------------------|-------:|---------:|
 | 1 | Analysis, requirements, translation of all 30 programs, test suite, report | 1.1 h | 367k |
 | 2 | Proof against the original COBOL, test execution, fixes | 0.5 h | 137k |
-| 3 | Restructure, demo tooling and guide, `CLAUDE.md`, code-review fixes, this presentation | 0.8 h | 115k |
-| **Total** | | **≈ 2.4 h** | **≈ 0.62M** |
+| 3 | Restructure, demo tooling and guide, `CLAUDE.md`, code-review fixes, this presentation | 0.9 h | 144k |
+| 4 | Original COBOL screens on a CICS stand-in, online comparison, fixes | 0.6 h | 155k |
+| **Total** | | **≈ 3.1 h** | **≈ 0.8M** |
 
 - Measured from the Claude Code session logs (pauses over 10 minutes removed).
 - Token cost depends on the subscription or API price list in use.
@@ -363,10 +366,10 @@ Review only rust/.
 \begin{tikzpicture}
 \begin{axis}[xbar, width=10.5cm, height=5.3cm, bar width=8pt, xmin=0, xmax=190,
   xlabel={output tokens (thousands)}, xlabel style={font=\small},
-  symbolic y coords={Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
+  symbolic y coords={Online COBOL bridge,Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
   ytick=data, yticklabel style={font=\small}, xticklabel style={font=\small},
   nodes near coords, nodes near coords style={font=\small}, enlarge y limits=0.08]
-\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (115.0,Restructure + demo + review fixes)};
+\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (144.0,Restructure + demo + review fixes) (155.0,Online COBOL bridge)};
 \end{axis}
 \end{tikzpicture}
 \end{center}
@@ -417,7 +420,8 @@ Identical outputs on agreed test data, test suite passed, owners sign off.
 python3 demo/demo.py cobol      # the original COBOL programs
 python3 demo/demo.py rust       # the Rust translation
 python3 demo/demo.py compare    # → IDENTICAL, file by file
-python3 demo/demo.py online     # the online screens
+python3 demo/demo.py online-cobol    # original screens; online = Rust
+python3 demo/demo.py online-compare  # → 338/338 screens identical
 ```
 
 Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.
@@ -447,9 +451,9 @@ Verification: `rust/difftest/run.py` (GnuCOBOL comparison) and `cargo test` (21 
 | KD-01 | Interest calculation | the last account's interest is never written back |
 | KD-02/03 | Transaction report | last amount counted twice; no final account total |
 | KD-07 | Card update screen | the card security code is wiped |
-| KD-08 | Account update screen | the "blank phone number" test checks the area code twice |
-| KD-10 | User / transaction lists | searching past the last record crashes the transaction |
 | KD-12 | Export / import | the programs do not compile as shipped |
 | KD-13 | Account update screen | the group id is saved into the ZIP-code field |
+| KD-14 | Admin menu | after a not-installed option, the next input is ignored |
+| KD-15 | Account update screen | an account with a blank group never counts as unchanged |
 
-All 12 are in the requirements specification, with the exact behaviour the translation reproduces.
+All 15 are in the requirements specification, with the exact behaviour the translation reproduces.

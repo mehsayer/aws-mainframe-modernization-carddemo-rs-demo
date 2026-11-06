@@ -118,7 +118,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | Type `11`, Enter. | Red message `This option Pending is not installed...` |
+| 1 | Type `11`, Enter. | Red message `This option Pending Authorization View is not installed...` |
 
 ## TC-MEN-04 — Navigation and return
 
@@ -136,15 +136,16 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 ## TC-ADM-01 — Admin menu
 
-**Requirements:** FR-ADM-01..04  
+**Requirements:** FR-ADM-01..04, KD-14  
 **Precondition:** Data reset (`carddemo reset`); signed on as ADMIN001 / PASSWORD (admin menu shown)
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | Inspect the menu. | Options 1-6 (User List/Add/Update/Delete (Security), Transaction Type ... (Db2)). |
 | 2 | Type `5`, Enter. | Green message `This option is not installed ...` (Db2 module out of scope). |
-| 3 | Type `7`, Enter. | `Please enter a valid option number...` |
-| 4 | Press F3. | Sign-on screen. |
+| 3 | Type `7`, Enter. | The menu is redrawn without a message: the input is ignored once after a not-installed option (KD-14). |
+| 4 | Type `7`, Enter again. | `Please enter a valid option number...` |
+| 5 | Press F3. | Sign-on screen. |
 
 # User administration
 
@@ -236,8 +237,8 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | Option `1`. | Info `Enter or update id of account to display`. Row 1 shows only `W` of the transaction id (map quirk FR-ACV-06). |
-| 2 | Enter with an empty account. | `Account number not provided`, red `*` in the account field. |
-| 3 | Account `abc`, Enter. | `Account Filter must be a non-zero 11 digit number` |
+| 2 | Enter with an empty account. | `No input received` (the original overwrites `Account number not provided`), red `*` in the account field. |
+| 3 | Account `abc`, Enter. | `Account Filter must  be a non-zero 11 digit number` |
 
 ## TC-ACV-02 — Account view: display
 
@@ -255,7 +256,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 ## TC-ACU-01 — Account update: fetch and no-change
 
-**Requirements:** FR-ACU-01..06  
+**Requirements:** FR-ACU-01..06, KD-15  
 **Precondition:** Data reset (`carddemo reset`); signed on as USER0001 / PASSWORD (main menu shown)
 
 | # | Action | Expected result |
@@ -263,7 +264,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | 1 | Option `2`. | Info `Enter or update id of account to update`. |
 | 2 | Account `0`, Enter. | `Account Number if supplied must be a 11 digit Non-Zero Number` |
 | 3 | Account `00000000001`, Enter. | Details shown, info `Update account details presented above.` |
-| 4 | Press Enter without changes. | `No change detected with respect to values fetched.` |
+| 4 | Press Enter without changes. | `FICO Score: should be between 300 and 850`: the account's group id is blank, so it never compares as unchanged (KD-15) and the fields are validated. |
 
 ## TC-ACU-02 — Account update: validation order
 
@@ -327,7 +328,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | `S` on row 1, Enter. | Card detail: info ` Displaying requested details`, embossed name, expiry month/year, status; search fields protected. |
+| 1 | `S` on row 1, Enter. | Card detail: info `   Displaying requested details` (three leading spaces), embossed name, expiry month/year, status; search fields protected. |
 | 2 | Press F3. | Card list. |
 
 ## TC-CDV-02 — Card detail by keys
@@ -338,7 +339,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
 | 1 | Option `4`. | Info `Please enter Account and Card Number`. |
-| 2 | Enter with both fields empty. | `Account number not provided`, both fields red `*`. |
+| 2 | Enter with both fields empty. | `No input received`, both fields red `*`. |
 | 3 | Account `00000000001`, card `1234`, Enter. | `CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER` |
 
 # Card update
@@ -357,7 +358,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | 4 | Name `JOHN 2`, Enter. | `Card name can only contain alphabets and spaces` |
 | 5 | Expiry month `13`, Enter. | `Card expiry month must be between 1 and 12` |
 | 6 | Valid values (status `N`), Enter. | Info `Changes validated.Press F5 to save`. |
-| 7 | Press F5. | Info `Changes committed to database`. The record's CVV is now `000` (KD-07). |
+| 7 | Press F5. | Info `Changes committed to database`. The record's CVV is overwritten with spaces (KD-07). |
 | 8 | Press Enter. | Back on the card list (called from the list). |
 
 # Transaction list
@@ -530,6 +531,19 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | 1 | In `rust/`: `python3 difftest/run.py`. | Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`). |
 | 2 | Read the result table. | Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0. |
 
+# Comparison with the original
+
+
+## TC-DIF-01 — Online screens: original COBOL vs Rust
+
+**Requirements:** NFR-01, NFR-15, KD-14..16  
+**Precondition:** GnuCOBOL 3.x installed; `cargo build --release`
+
+| # | Action | Expected result |
+|--:|-----------------|---------------------------|
+| 1 | `python3 demo/demo.py online-cobol` in one window and `python3 demo/demo.py online` in another; sign on as USER0001 and go through account view, card list and bill payment in both. | Both show the same screens, messages and results; the header shows the same program names. |
+| 2 | `python3 demo/demo.py online-compare`. | Every test passes on both; `Screens compared: 338; identical: 338` with two accepted compiler differences; `Overall: all screens identical, all tests pass on both`. |
+
 # Requirements coverage
 
 | Requirement group | Test cases |
@@ -560,12 +574,12 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 | FR-USR-LST | TC-USR-01, TC-USR-02, TC-USR-04 |
 | FR-USR-UPD | TC-USR-06 |
 
-41 test cases, 124 steps; 25 of 25 functional requirement groups covered.
+42 test cases, 127 steps; 25 of 25 functional requirement groups covered.
 
 
 # Execution log
 
-Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **41 of 41 passed.**
+Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **42 of 42 passed.**
 
 | Test case | Date | Tester | Result | Notes |
 |---|---|---|---|---|
@@ -610,3 +624,4 @@ Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run th
 | TC-BAT-06 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
 | TC-BAT-07 | 2026-11-06 | Claude Code (scripted) | Pass | scripted terminal |
 | TC-BAT-08 | 2026-11-06 | Claude Code (scripted) | Pass | difftest/run.py: 40 comparisons, all identical |
+| TC-DIF-01 | 2026-11-06 | Claude Code (scripted) | Pass | difftest/online.py: 338/338 screens identical |

@@ -5,8 +5,10 @@ programs, then compare what they produced.
     python3 demo/demo.py cobol      # original COBOL programs (compiled with GnuCOBOL)
     python3 demo/demo.py rust       # the Rust translation
     python3 demo/demo.py compare    # are the results the same?
-    python3 demo/demo.py online     # the Rust online system (terminal screens)
-    python3 demo/demo.py all        # cobol, rust, compare in one go
+    python3 demo/demo.py online         # the online screens, Rust translation
+    python3 demo/demo.py online-cobol   # the same screens, ORIGINAL COBOL programs (CICS bridge)
+    python3 demo/demo.py online-compare # replay the scripted terminal sessions on both, compare every screen
+    python3 demo/demo.py all            # cobol, rust, compare in one go
 
 Results go to demo/out/cobol and demo/out/rust, with the same file names on both sides:
   posting-log.txt   console output of the daily posting program
@@ -169,13 +171,29 @@ def compare():
     return same
 
 
-def online():
+def online(cobol=False):
     ensure_built()
-    env = dict(os.environ, CARDDEMO_HOME=str(OUT / "online"), CARDDEMO_SEED=str(h.SEED))
+    if cobol and not (ROOT / "rust" / "cobridge" / "build" / "modules" / "COSGN00C.so").exists():
+        say("Translating and compiling the original COBOL screen programs (first time only) ...")
+        subprocess.run([sys.executable, str(ROOT / "rust" / "cobridge" / "cicsprep.py")], check=True)
+    # separate data stores, so the two systems can run side by side
+    env = dict(os.environ, CARDDEMO_HOME=str(OUT / ("online-cobol" if cobol else "online")), CARDDEMO_SEED=str(h.SEED))
     subprocess.run([str(h.BIN), "reset"], env=env, check=True, capture_output=True)
+    which = "the ORIGINAL COBOL programs" if cobol else "the Rust translation"
+    print(f"Online screens running {which}.")
     print("Sign on with  USER0001 / PASSWORD  (or ADMIN001 / PASSWORD).  F3 = back, Esc = clear, F3 on the sign-on screen = exit.")
     time.sleep(2)
-    os.execve(str(h.BIN), [str(h.BIN), "online"], env)
+    os.execve(str(h.BIN), [str(h.BIN), "online"] + (["--cobol"] if cobol else []), env)
+
+
+def online_compare():
+    ensure_built()
+    say("Replaying the scripted terminal sessions on the Rust and on the original COBOL programs ...")
+    r = subprocess.run([sys.executable, str(ROOT / "rust" / "difftest" / "online.py")], capture_output=True, text=True)
+    for l in r.stdout.splitlines():
+        if l.startswith(("|", "Screens compared", "**Overall")):
+            print("    " + l.replace("**", ""))
+    return r.returncode == 0
 
 
 if __name__ == "__main__":
@@ -189,6 +207,10 @@ if __name__ == "__main__":
         sys.exit(0 if compare() else 1)
     elif cmd == "online":
         online()
+    elif cmd == "online-cobol":
+        online(cobol=True)
+    elif cmd == "online-compare":
+        sys.exit(0 if online_compare() else 1)
     elif cmd == "all":
         cobol(); print(); rust(); print(); sys.exit(0 if compare() else 1)
     else:

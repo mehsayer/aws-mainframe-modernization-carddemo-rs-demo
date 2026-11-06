@@ -21,6 +21,8 @@ for m in re.finditer(r"thread '(tc_\w+)'.*?panicked at [^\n]*\n([^\n]*)", out, r
 
 d = subprocess.run([sys.executable, os.path.join(RS, "difftest", "run.py")], cwd=RS, capture_output=True, text=True)
 rows = len(re.findall(r"^\| .* \| (identical|\*\*)", d.stdout, re.M))
+o = subprocess.run([sys.executable, os.path.join(RS, "difftest", "online.py")], cwd=RS, capture_output=True, text=True)
+om = re.search(r"Screens compared: (\d+); identical: (\d+)", o.stdout)
 
 today = datetime.date.today().isoformat()
 res = {}
@@ -29,6 +31,10 @@ for c in CASES:
     if cid == "TC-BAT-08":
         res[cid] = {"result": "Pass" if d.returncode == 0 else "Fail",
                     "notes": f"difftest/run.py: {rows} comparisons, " + ("all identical" if d.returncode == 0 else "differences, see report")}
+        continue
+    if cid == "TC-DIF-01":
+        res[cid] = {"result": "Pass" if o.returncode == 0 else "Fail",
+                    "notes": f"difftest/online.py: {om.group(2)}/{om.group(1)} screens identical" if om else "online.py did not run"}
         continue
     key = cid.lower().replace("-", "_")
     st = status.get(key)

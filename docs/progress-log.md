@@ -75,3 +75,19 @@ All 10 findings fixed, with regression tests (`rust/crates/online/tests/review_f
   message only says "backed out" when it is true. File operations are atomic (savepoint).
 - SYNCPOINT from PF3 goes through the task (releases READ UPDATE holds); floating-sign edit pictures fixed.
 Re-verified: 21 test suites, clippy clean, difftest identical, manual suite 41/41.
+
+## Session 4 (2026-11-06): the original online programs on a CICS stand-in
+
+- `rust/cobridge/cicsprep.py` (CICS translator), own DFH copybooks, CEEDAYS in C; `rust/crates/cobridge` runs the
+  17 original COBOL online programs on the project's CICS layer (libcob FFI, CANCEL after each task, zero-filled
+  32 KB commarea).
+- All online tests run on the COBOL programs too (`CARDDEMO_REGION=cobol`); `rust/difftest/online.py` compares
+  every screen: 338/338 identical (2 accepted compiler-dependent cases).
+- Found by it and fixed in Rust: 11 fidelity gaps (literals with double/leading spaces, "No input received"
+  overwrites, protection and cursor rules, F-key attributes, X'00' dates, text length, CVV bytes) plus KD-14 and
+  KD-15 reproduced. New defects of the original: KD-14 (admin menu), KD-15 (no-change test), KD-16 (reads past
+  EIBCALEN).
+- `carddemo online --cobol`, `demo.py online-cobol` / `online-compare`, DEMO.md side by side, TC-DIF-01 (42/42),
+  NFR-15, deck updated.
+
+Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.

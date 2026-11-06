@@ -176,17 +176,27 @@ For example, the step that creates a missing balance record:
 |---|---|
 | `less +/2700-A-CREATE cobol/app/cbl/CBTRN02C.cbl` | `less +/2700-A-CREATE rust/crates/batch/src/cbtrn02c.rs` |
 
-## Demo 3: the online screens (5 minutes)
+## Demo 3: the online screens, old and new side by side (5–10 minutes)
 
-```sh
-python3 demo/demo.py online
-```
+The original screens were written for **IBM CICS**, the mainframe's transaction system, which does not run
+on a laptop. To show them anyway, the project contains a small **stand-in for CICS**: the original COBOL
+screen programs are compiled unchanged with the free COBOL compiler and use the same screen and file layer
+as the Rust version. So both run in the same terminal window style, on their own copy of the same data.
 
-This opens the **new** system's screens in the terminal, looking like the original green-screen
-terminal. Keys: **Enter** sends the screen, **F3** goes back, **F7/F8** page up/down, **F5** saves,
-**Tab** moves to the next field, **Esc** clears the screen, **Ctrl+Q** quits.
+Open **two terminal windows** side by side, both in the project folder:
 
-A short walk-through:
+| Left window: the original COBOL | Right window: the Rust translation |
+|---|---|
+| `python3 demo/demo.py online-cobol` | `python3 demo/demo.py online` |
+
+The first `online-cobol` run compiles the COBOL screen programs (about half a minute). Each window shows
+in its header which program is running (`Prog : COSGN00C` etc.); the program names are the same on both
+sides, because the Rust modules keep the original names.
+
+Keys: **Enter** sends the screen, **F3** goes back, **F7/F8** page up/down, **F5** saves, **Tab** moves to
+the next field, **Esc** clears the screen, **Ctrl+Q** quits.
+
+Do the same steps in both windows, one after the other:
 
 1. User `USER0001`, password `PASSWORD`, Enter. You see the **Main Menu**.
 2. Type `1` and Enter: **Account View**. Type account `00000000001` and Enter: balance, limits,
@@ -194,14 +204,29 @@ A short walk-through:
 3. F3 back to the menu. Type `3`: the **Card List**. F8 shows the next page. Type `S` next to a card and
    press Enter to see its details.
 4. F3 twice, then `10`: **Bill Payment**. Account `00000000001`, Enter shows the balance, type `Y` and
-   Enter to pay. The screen shows the new transaction number.
+   Enter to pay. The screen shows the new transaction number, the same on both sides.
 5. F3 to the menu, F3 again to sign off.
 
-**Why there is no COBOL version of this part in the demo:** the original screens need a mainframe
-transaction system (IBM CICS), which is not available on a laptop. For the screens we show instead that
-the Rust version draws them from the original screen definition files: compare
-`less cobol/app/bms/COSGN00.bms` with the sign-on screen. Their correctness is checked by the 41-case
-test suite (see `docs/manual-test-suite.pdf`).
+**What to say:** "On the left, the original 1990s mainframe programs; on the right, the AI's translation.
+Same screens, same messages, same results, down to the transaction number."
+
+### Let the computer compare the screens (2 minutes)
+
+```sh
+python3 demo/demo.py online-compare
+```
+
+This replays the scripted terminal sessions of the test suite (sign-on, menus, users, accounts, cards,
+transactions, payments, reports) on both systems and compares every screen: every field, colour,
+attribute and the cursor position. It ends with:
+
+```text
+    Screens compared: 338; identical: 338 (including 2 accepted compiler difference(s), below).
+    Overall: all screens identical, all tests pass on both
+```
+
+The two accepted differences are cases where the original moves invalid data into a number field;
+the result there depends on which COBOL compiler is used (explained in `docs/difftest/online-report.md`).
 
 ## Demo 4: the full proof (2 minutes, optional)
 
@@ -209,17 +234,20 @@ test suite (see `docs/manual-test-suite.pdf`).
 python3 rust/difftest/run.py --no-build
 ```
 
-This is the check the engineers use. It compares 13 programs and 40 outputs: files, reports, return
+This is the batch check the engineers use. It compares 13 programs and 40 outputs: files, reports, return
 codes and console messages. It ends with **"Overall: all outputs identical"**. The full table is in
-`rust/difftest/out/report.md`.
+`rust/difftest/out/report.md`; the online counterpart is `python3 rust/difftest/online.py`
+(report in `docs/difftest/online-report.md`).
 
 ## Talking points
 
-- **Speed.** The translation of about 27,000 lines of COBOL took about 1.6 hours of the AI's working
-  time, spread over two sessions, plus a person reviewing the plan and the results.
+- **Speed.** The translation of about 27,000 lines of COBOL, its documents and both proofs took about
+  three hours of the AI's working time, spread over several sessions, plus a person reviewing the plan and
+  the results.
+- **Both halves proven.** Batch: 40 outputs identical. Online: 338 screens identical.
 - **Proof, not promises.** The new system is checked against the old one by running both, not by reading
   code. The checks are repeatable: anyone can run the commands above.
-- **The AI found problems in the original.** Twelve defects are documented in the requirements
+- **The AI found problems in the original.** Fifteen defects are documented in the requirements
   (`docs/requirements.pdf`, "Known defects"). Two programs in the original do not even compile.
 - **People stay in control.** The AI wrote a plan and waited for approval. It writes down everything it
   decides, and it is told what to review and what never to change. Those instructions live in

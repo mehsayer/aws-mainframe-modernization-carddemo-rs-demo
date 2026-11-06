@@ -29,6 +29,43 @@ extern "C" {
     fn cob_get_s64_param(n: c_int) -> i64;
     fn cob_put_s64_param(n: c_int, v: i64);
     fn cob_get_param_constant(n: c_int) -> c_int;
+    fn dup(fd: c_int) -> c_int;
+    fn dup2(from: c_int, to: c_int) -> c_int;
+    fn close(fd: c_int) -> c_int;
+    fn fflush(stream: *mut c_void) -> c_int;
+}
+
+/// COBOL DISPLAY output (stdout) goes to the file named by `CARDDEMO_COBOL_SYSOUT` while a program runs,
+/// so it cannot disturb a full-screen terminal UI. Without the variable it stays on stdout.
+struct SysoutRedirect {
+    saved: c_int,
+}
+
+impl SysoutRedirect {
+    fn start() -> Option<SysoutRedirect> {
+        use std::os::fd::AsRawFd;
+        let path = std::env::var_os("CARDDEMO_COBOL_SYSOUT")?;
+        let file = std::fs::OpenOptions::new().create(true).append(true).open(path).ok()?;
+        unsafe {
+            fflush(std::ptr::null_mut());
+            let saved = dup(1);
+            if saved < 0 {
+                return None;
+            }
+            dup2(file.as_raw_fd(), 1);
+            Some(SysoutRedirect { saved })
+        }
+    }
+}
+
+impl Drop for SysoutRedirect {
+    fn drop(&mut self) {
+        unsafe {
+            fflush(std::ptr::null_mut());
+            dup2(self.saved, 1);
+            close(self.saved);
+        }
+    }
 }
 
 const RC_TRANSFER: c_int = 99;
@@ -149,7 +186,9 @@ pub fn run(t: &mut Task) -> Cr {
     };
     let prev = CTX.with(|c| c.replace(&mut ctx));
     let mut args = [eib.as_mut_ptr() as *mut c_void, ca.as_mut_ptr() as *mut c_void];
+    let sysout = SysoutRedirect::start();
     unsafe { cob_call(name.as_ptr(), 2, args.as_mut_ptr()) };
+    drop(sysout);
     // CICS gives every task a fresh copy of WORKING-STORAGE; a CALLed GnuCOBOL program keeps its state
     // (and any PERFORM return addresses left by a HANDLE CONDITION GO TO) until it is cancelled
     unsafe { cob_cancel(name.as_ptr()) };

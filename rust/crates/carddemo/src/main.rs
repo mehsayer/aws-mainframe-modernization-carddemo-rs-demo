@@ -56,6 +56,10 @@ enum Cmd {
         /// Initial transaction
         #[arg(long, default_value = "CC00")]
         tran: String,
+        /// Run the ORIGINAL COBOL screen programs (GnuCOBOL, CICS bridge) instead of the Rust translation.
+        /// Build the modules first: python3 rust/cobridge/cicsprep.py
+        #[arg(long)]
+        cobol: bool,
     },
     /// Unload every KSDS to DIR/<DATASET>.dat (fixed-length ASCII records, key order) — IDCAMS REPRO OUTFILE
     Unload { dir: PathBuf },
@@ -142,9 +146,9 @@ fn main() -> Result<()> {
                 println!("{:<10} {n:>5} records", ds.name);
             }
         }
-        Cmd::Online { tran } => {
+        Cmd::Online { tran, cobol } => {
             let seed = find_seed(cli.seed.clone()).ok();
-            online(&cli.home, seed, &tran)?;
+            online(&cli.home, seed, &tran, cobol)?;
         }
         Cmd::Script { steps } => {
             let v = open_store(&cli.home)?;
@@ -275,14 +279,14 @@ fn unprotected(s: &cics::Screen) -> Vec<usize> {
     v
 }
 
-fn online(home: &Path, seed: Option<PathBuf>, tran: &str) -> Result<()> {
+fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result<()> {
     let v = open_store(home)?;
     if v.count("USRSEC").unwrap_or(0) == 0 {
         if let Some(seed) = &seed {
             batch::repro::reset(&v, seed).map_err(anyhow::Error::msg)?;
         }
     }
-    let mut region = online::region(v);
+    let mut region = if cobol { cobol_region(v, home)? } else { online::region(v) };
     let queue: Arc<Mutex<Vec<Vec<Vec<u8>>>>> = Arc::new(Mutex::new(Vec::new()));
     let q2 = queue.clone();
     region.on_job = Some(Box::new(move |deck: &[Vec<u8>]| q2.lock().unwrap().push(deck.to_vec())));
@@ -450,4 +454,19 @@ fn run_submitted(home: &Path, seed: Option<PathBuf>, deck: &[Vec<u8>]) -> String
         Ok(_) => format!("Job TRNRPT00 ended RC=0000: report {start}..{end} in {}", env.gdg("TRANREPT", 0).display()),
         Err((_, a)) => format!("Job TRNRPT00 ended with {a}"),
     }
+}
+
+/// The original COBOL programs on the CICS bridge; their DISPLAY output goes to `<home>/cobol-sysout.log`.
+#[cfg(feature = "cobol")]
+fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
+    if !cobridge::available() {
+        bail!("COBOL modules not built: run  python3 rust/cobridge/cicsprep.py  (needs GnuCOBOL)");
+    }
+    std::env::set_var("CARDDEMO_COBOL_SYSOUT", home.join("cobol-sysout.log"));
+    Ok(cobridge::region(v))
+}
+
+#[cfg(not(feature = "cobol"))]
+fn cobol_region(_v: vsam::Vsam, _home: &Path) -> Result<cics::Region> {
+    bail!("this carddemo was built without the `cobol` feature (GnuCOBOL bridge)")
 }

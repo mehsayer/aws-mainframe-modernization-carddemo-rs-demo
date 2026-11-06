@@ -160,6 +160,7 @@ dependencies = [
  "cics",
  "clap",
  "cobol",
+ "cobridge",
  "crossterm",
  "online",
  "ratatui",

@@ -42,3 +42,18 @@ CBTRN01C, CBTRN02C (POSTTRAN), CBACT04C (INTCALC), CBTRN03C (TRANREPT), CBSTM03A
 CBEXPORT/CBIMPORT (FD patched for KD-12). The harness generates small COBOL load/unload programs for the
 indexed files, a C stub for CEE3ABD, and a PARM wrapper for CBACT04C; CBSTM03A's z/OS control-block walk
 (PSA/TCB/TIOT) is commented out. Platform differences that are normalised are listed in the script.
+
+## The original online programs on the CICS bridge
+
+`cobridge/cicsprep.py` translates the original CICS COBOL programs (`EXEC CICS` becomes a call through a
+procedure pointer in the EIB) and compiles them with GnuCOBOL; `crates/cobridge` runs them on the same CICS
+runtime, screens and data store as the Rust programs (libcob via FFI). The project's own `DFHAID`,
+`DFHBMSCA`, `DFHATTR` and `DFHEIBLK` copybooks (`cobridge/copy/`) and a CEEDAYS (`cobridge/ceedays.c`) stand in
+for the IBM-supplied parts.
+
+```sh
+python3 cobridge/cicsprep.py                    # 17 programs + CSUTLDTC + CEEDAYS -> cobridge/build/modules
+target/release/carddemo online --cobol           # the original screens in the terminal UI
+python3 difftest/online.py                      # all online tests on both; every screen compared
+```
+

@@ -224,4 +224,9 @@ CASES = [
   ("In `rust/`: `python3 difftest/run.py`.", "Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`)."),
   ("Read the result table.", "Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0."),
 ]),
+# ---------------------------------------------------------------- comparison with the original
+("TC-DIF-01", "Online screens: original COBOL vs Rust", "NFR-01, NFR-15, KD-14..16", "GnuCOBOL 3.x installed; `cargo build --release`", [
+  ("`python3 demo/demo.py online-cobol` in one window and `python3 demo/demo.py online` in another; sign on as USER0001 and go through account view, card list and bill payment in both.", "Both show the same screens, messages and results; the header shows the same program names."),
+  ("`python3 demo/demo.py online-compare`.", "Every test passes on both; `Screens compared: 338; identical: 338` with two accepted compiler differences; `Overall: all screens identical, all tests pass on both`."),
+]),
 ]

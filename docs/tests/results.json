@@ -165,6 +165,10 @@
   "TC-BAT-08": {
    "result": "Pass",
    "notes": "difftest/run.py: 40 comparisons, all identical"
+  },
+  "TC-DIF-01": {
+   "result": "Pass",
+   "notes": "difftest/online.py: 338/338 screens identical"
   }
  }
 }

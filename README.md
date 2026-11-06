@@ -4,7 +4,7 @@
 |---|---|
 | [`cobol/`](cobol/) | The original [AWS CardDemo](cobol/README.md) mainframe application (COBOL, CICS, VSAM, JCL), unchanged |
 | [`rust/`](rust/) | The Rust translation ([README](rust/README.md)): batch jobs, online screens in a terminal, differential test |
-| [`demo/`](demo/) | `python3 demo/demo.py all`: run the original COBOL batch and the Rust batch, then compare the results |
+| [`demo/`](demo/) | `python3 demo/demo.py all`: run the original COBOL batch and the Rust batch, then compare the results; `online-cobol` / `online` / `online-compare` for the screens |
 | [`docs/`](docs/) | [Demo guide](docs/DEMO.md), requirements, manual test suite, presentation (PDF) |
 
 Quick start (needs Rust, Python 3 and GnuCOBOL):
