@@ -14,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RS = HERE.parent
-OUT = HERE / "out" / "online"
+OUT = HERE / "out-online"
 # test targets that drive the terminal through tests/common::region() (the others build their own regions)
 TARGETS = ["manual_suite", "signon", "users", "cards_accounts", "transactions", "review_fixes"]
 
