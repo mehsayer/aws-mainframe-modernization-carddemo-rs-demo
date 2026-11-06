@@ -19,7 +19,7 @@ Common rule **BR-BAT-002**: when a program builds a "DB2-format timestamp", the 
 
 ## FR-BAT-POST — Daily transaction posting (job POSTTRAN, program CBTRN02C)
 
-*Source: app/cbl/CBTRN02C.cbl, app/jcl/POSTTRAN.jcl*
+*Source: cobol/app/cbl/CBTRN02C.cbl, cobol/app/jcl/POSTTRAN.jcl*
 
 **Inputs:** DALYTRAN (sequential, 350-byte CVTRA06Y records), XREFFILE (KSDS keyed by
 card number), ACCTFILE (KSDS keyed by account id, opened I-O), TCATBALF (KSDS keyed by
@@ -44,7 +44,7 @@ input record plus an 80-byte validation trailer).
 
 ## FR-BAT-INT — Interest calculation (job INTCALC, program CBACT04C)
 
-*Source: app/cbl/CBACT04C.cbl, app/jcl/INTCALC.jcl. PARM = run date `YYYY-MM-DD`
+*Source: cobol/app/cbl/CBACT04C.cbl, cobol/app/jcl/INTCALC.jcl. PARM = run date `YYYY-MM-DD`
 (e.g. `2022071800`, of which the first 10 characters are used).*
 
 **Inputs:** TCATBALF (KSDS, read sequentially in key order), XREFFILE (KSDS, read through
@@ -66,7 +66,7 @@ transaction per category balance that has a non-zero rate.
 
 ## FR-BAT-REPT — Transaction detail report (job TRANREPT, program CBTRN03C)
 
-*Source: app/cbl/CBTRN03C.cbl, app/jcl/TRANREPT.jcl. The JCL first sorts TRANSACT by card
+*Source: cobol/app/cbl/CBTRN03C.cbl, cobol/app/jcl/TRANREPT.jcl. The JCL first sorts TRANSACT by card
 number (and filters by date) into TRANSACT.DALY, then runs CBTRN03C. The job can also be
 submitted from the online Report screen (CORPT00C).*
 
@@ -87,7 +87,7 @@ submitted from the online Report screen (CORPT00C).*
 
 ## FR-BAT-STMT — Customer statements (job CREASTMT, programs CBSTM03A + CBSTM03B)
 
-*Source: app/cbl/CBSTM03A.CBL, CBSTM03B.CBL, app/jcl/CREASTMT.JCL.*
+*Source: cobol/app/cbl/CBSTM03A.CBL, CBSTM03B.CBL, cobol/app/jcl/CREASTMT.JCL.*
 
 The job sorts TRANSACT by card number (pos 263, length 16) then transaction id, and
 loads the result into a KSDS (TRXFL) keyed by card + tran id. CBSTM03A produces two

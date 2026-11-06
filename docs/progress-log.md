@@ -1,6 +1,6 @@
 # Progress Log — CardDemo COBOL → Rust
 
-Metrics come from `carddemo-rs/tools/usage.py`, which reads the Claude Code session transcripts.
+Metrics come from `rust/tools/usage.py`, which reads the Claude Code session transcripts.
 
 | When (UTC+1) | Phase | Event | Active h (cum.) | Output tokens (cum.) |
 |---|---|---|---:|---:|
@@ -28,14 +28,14 @@ Metrics come from `carddemo-rs/tools/usage.py`, which reads the Claude Code sess
 | 2026-11-05 18:45 | 8 | progress presentation PDF (17 slides) | 1.1 (session) | 367k (session) |
 
 Session 1 totals (tools/usage.py): ≈1.1 h active, 194 turns, 212 tool calls, 367k output tokens, 90.9M cache-read tokens.
-Per-phase breakdown: `python3 carddemo-rs/tools/phase_metrics.py`.
+Per-phase breakdown: `python3 rust/tools/phase_metrics.py`.
 
 ## Session 2 (2026-11-06)
 
 | When (UTC+1) | Phase | Event |
 |---|---|---|
 | 11:05 | 7 | gmp-devel installed by the user; GnuCOBOL 3.2 compiles the original batch programs |
-| 11:28 | 7 | `carddemo-rs/difftest/run.py`: 13 batch programs, all outputs identical after fixes (commit fa42553) |
+| 11:28 | 7 | `rust/difftest/run.py`: 13 batch programs, all outputs identical after fixes (commit fa42553) |
 | 11:31 | 7 | clippy clean (all targets); multi-session tests (commit 401d457) |
 | 11:40 | 6b | manual test suite executed, 41/41 pass; execution log filled (commit cc5fb5d) |
 | 11:42 | 8 | deck updated with session 2 results and metrics |
@@ -53,3 +53,15 @@ Findings:
 
 Totals after session 2 (tools/usage.py): ≈1.6 h active, 374 turns, 399 tool calls, 504k output tokens,
 132.2M cache-read tokens.
+
+## Session 3 (2026-11-06)
+
+- Repository restructured: `cobol/` (original AWS CardDemo, unchanged: app, diagrams, samples, scripts, README)
+  and `rust/` (the translation, formerly `carddemo-rs/`). All paths updated; tests, difftest and suite re-verified.
+- `demo/demo.py`: standalone COBOL batch run, Rust batch run, file-by-file comparison, online screens.
+- `docs/DEMO.md` rewritten for non-technical audiences (one after the other, side by side, online, proof).
+- `CLAUDE.md`: layout, commands, code-review scope (`rust/` only), translation rules; root `README.md`.
+- Presentation rewritten for senior management (AI-assisted modernization pilot and proposal), including what
+  the original application does, CLAUDE.md, human oversight and Remote Control.
+
+Totals after session 3 (tools/usage.py): ≈1.9 h active, ≈0.56M output tokens.

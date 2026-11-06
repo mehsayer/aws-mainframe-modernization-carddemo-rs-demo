@@ -34,7 +34,7 @@ repository `aws-mainframe-modernization-carddemo`.
 
 It serves three purposes:
 
-1. It is the specification for the Rust re-implementation (`carddemo-rs`).
+1. It is the specification for the Rust re-implementation (`rust/`).
 2. It is the basis of the manual test suite. Every test case traces to a requirement ID
    defined here.
 3. It is a record of how the system behaves today, **including its defects**. The

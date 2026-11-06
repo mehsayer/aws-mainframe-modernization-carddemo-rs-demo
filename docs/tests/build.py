@@ -33,7 +33,7 @@ header-includes:
 
 # How to use this suite
 
-**Environment.** Build `carddemo` (`cargo build --release` in `carddemo-rs`), set `CARDDEMO_HOME` to an empty
+**Environment.** Build `carddemo` (`cargo build --release` in `rust/`), set `CARDDEMO_HOME` to an empty
 directory and run `carddemo reset` before each test unless the precondition says otherwise.
 Online tests run in `carddemo online`. Keys: Enter, F1–F12 = PF1–PF12, Shift+F1–F12 = PF13–PF24,
 Esc = CLEAR, Tab between fields, Ctrl+E = ERASE EOF.
@@ -96,7 +96,7 @@ if os.path.exists(os.path.join(HERE, "results.json")):
     res = log["results"]
     passed = sum(1 for v in res.values() if v["result"] == "Pass")
     out.append(f"Executed {log['date']} by {log['tester']}: the online and batch cases run through the same "
-               "3270 screen model the terminal UI uses (`carddemo-rs/crates/online/tests/manual_suite.rs`, one test "
+               "3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test "
                "per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with "
                f"`python3 docs/tests/execute.py`. **{passed} of {len(res)} passed.**\n")
 out.append("| Test case | Date | Tester | Result | Notes |\n|---|---|---|---|---|")

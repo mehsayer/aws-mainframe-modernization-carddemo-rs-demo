@@ -220,7 +220,7 @@ CASES = [
   ("`time carddemo reset`.", "Completes in well under a second."),
 ]),
 ("TC-BAT-08", "Differential test against the original COBOL", "NFR-01, NFR-13, NFR-14, KD-12", "GnuCOBOL 3.x installed; `cargo build --release`", [
-  ("In `carddemo-rs`: `python3 difftest/run.py`.", "Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`)."),
+  ("In `rust/`: `python3 difftest/run.py`.", "Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`)."),
   ("Read the result table.", "Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0."),
 ]),
 ]

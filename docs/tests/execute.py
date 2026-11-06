@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the manual test suite with the scripted terminal (carddemo-rs/crates/online/tests/manual_suite.rs)
+"""Execute the manual test suite with the scripted terminal (rust/crates/online/tests/manual_suite.rs)
 and the differential test (TC-BAT-08), and record the results in results.json for the execution log.
 
   python3 docs/tests/execute.py        # then: python3 docs/tests/build.py
@@ -7,7 +7,7 @@ and the differential test (TC-BAT-08), and record the results in results.json fo
 import datetime, json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RS = os.path.join(HERE, "..", "..", "carddemo-rs")
+RS = os.path.join(HERE, "..", "..", "rust")
 sys.path.insert(0, HERE)
 from cases import CASES  # noqa: E402
 

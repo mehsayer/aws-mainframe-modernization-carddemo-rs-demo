@@ -18,7 +18,7 @@ header-includes:
 
 # How to use this suite
 
-**Environment.** Build `carddemo` (`cargo build --release` in `carddemo-rs`), set `CARDDEMO_HOME` to an empty
+**Environment.** Build `carddemo` (`cargo build --release` in `rust/`), set `CARDDEMO_HOME` to an empty
 directory and run `carddemo reset` before each test unless the precondition says otherwise.
 Online tests run in `carddemo online`. Keys: Enter, F1–F12 = PF1–PF12, Shift+F1–F12 = PF13–PF24,
 Esc = CLEAR, Tab between fields, Ctrl+E = ERASE EOF.
@@ -527,7 +527,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 | # | Action | Expected result |
 |--:|-----------------|---------------------------|
-| 1 | In `carddemo-rs`: `python3 difftest/run.py`. | Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`). |
+| 1 | In `rust/`: `python3 difftest/run.py`. | Builds the original batch programs with GnuCOBOL, runs them and the Rust port on the same data, and prints the report (also in `difftest/out/report.md`). |
 | 2 | Read the result table. | Every row is `identical` (one row marked with an accepted GnuCOBOL difference, explained under the table); `Overall: all outputs identical`; exit code 0. |
 
 # Requirements coverage
@@ -565,7 +565,7 @@ Pass / Fail in the execution log at the end. Messages must match **exactly**, in
 
 # Execution log
 
-Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`carddemo-rs/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **41 of 41 passed.**
+Executed 2026-11-06 by Claude Code (scripted): the online and batch cases run through the same 3270 screen model the terminal UI uses (`rust/crates/online/tests/manual_suite.rs`, one test per case, every step asserted); TC-BAT-08 runs the GnuCOBOL differential test. Re-run with `python3 docs/tests/execute.py`. **41 of 41 passed.**
 
 | Test case | Date | Tester | Result | Notes |
 |---|---|---|---|---|

@@ -1,6 +1,6 @@
 # Data Dictionary
 
-Field layouts generated from the copybooks by `carddemo-rs/tools/copybook.py`. Offsets are 1-based. COMP/COMP-3 lengths are storage bytes.
+Field layouts generated from the copybooks by `rust/tools/copybook.py`. Offsets are 1-based. COMP/COMP-3 lengths are storage bytes.
 
 ### SEC-USER-DATA — `CSUSR01Y.cpy` (80 bytes)
 
