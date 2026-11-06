@@ -210,6 +210,57 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 The original COBOL is compiled with a free COBOL compiler and run **on the same data, with the same
 clock**. Anyone can repeat the check with one command (see the live demo).
 
+## Next: the original online screens, live
+
+\begin{center}
+\begin{tikzpicture}[node distance=5mm and 6mm, every node/.style={font=\footnotesize, align=center},
+  box/.style={draw, rounded corners, fill=blue!8, minimum height=9mm, text width=27mm},
+  old/.style={box, fill=orange!20}, arr/.style={-{Stealth[length=2mm]}, thick}]
+\node[old] (cob) {Original COBOL screen programs (unchanged)};
+\node[box, right=of cob] (tr) {CICS translator: \texttt{EXEC CICS} → call};
+\node[box, right=of tr] (mod) {Compiled with free GnuCOBOL};
+\node[box, below=7mm of mod, text width=40mm] (cics) {\textbf{Shared CICS layer}: screens, files, transactions};
+\node[box, left=of cics] (rs) {Rust screen programs (translation)};
+\node[box, right=of cics, text width=24mm] (ui) {Terminal and the same data};
+\draw[arr] (cob) -- (tr); \draw[arr] (tr) -- (mod);
+\draw[arr, <->] (mod) -- (cics);
+\draw[arr, <->] (rs) -- (cics);
+\draw[arr, <->] (cics) -- (ui);
+\end{tikzpicture}
+\end{center}
+
+- Real CICS runs only on licensed mainframes: the original programs get a **stand-in for CICS**, the layer
+  the Rust version already uses. Both runs share it, so the comparison checks the business logic
+- Result: old and new screens **side by side**, and an **automated online comparison**
+- First check done: all 17 original screen programs compile unchanged with the free compiler
+
+## Why not run it on an emulated mainframe?
+
+::: columns
+:::: {.column width="48%"}
+\colhead{The idea}
+
+**Hercules**, a free PC emulator of IBM mainframe hardware: why not run the original on it?
+
+\vspace{6pt}
+\colhead{What a free setup can run}
+
+- MVS 3.8j, the operating system from 1981 that may be used freely
+- No CICS: only the hobbyist look-alike **KICKS**
+- Only a 1970s COBOL compiler (ANSI COBOL 74)
+::::
+:::: {.column width="48%"}
+\colhead{Why that does not work for CardDemo}
+
+- CardDemo is modern **Enterprise COBOL** (COBOL 85 and later: EVALUATE, END-IF, inline PERFORM,
+  intrinsic functions); it does not compile with a COBOL 74 compiler
+- Making it compile would mean **rewriting the original**, the opposite of what the demo must show
+- Current z/OS with real CICS on a PC needs IBM's **licensed** test environment (ZD&T)
+::::
+:::
+
+\keypoint{The CICS bridge runs the original code unchanged, at no licence cost.}
+
 ## What the AI found that people had missed
 
 ::: columns
