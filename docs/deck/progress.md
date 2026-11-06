@@ -107,9 +107,6 @@ who the customers are, which cards and accounts they hold, what they spent and w
 ::::
 :::
 
-\footer{AWS published CardDemo as a realistic test case for mainframe modernization: it uses the same technology
-(COBOL, CICS screens, VSAM files, JCL batch jobs) as real banking systems.}
-
 ## A day in the life of the system
 
 ::: columns
