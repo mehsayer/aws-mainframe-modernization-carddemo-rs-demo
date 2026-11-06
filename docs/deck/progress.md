@@ -113,23 +113,23 @@ who the customers are, which cards and accounts they hold, what they spent and w
 :::: {.column width="48%"}
 \colhead{During the day: online screens}
 
-- **Sign on**: the menu depends on your role
-- **Accounts**: view; change limits, address, phones
-- **Cards**: list, view, block, change name or expiry
-- **Transactions**: browse, view, add manually
-- **Bill payment**: pay off a balance in full
-- **Reports**: request a report for any period
-- **Users**: add, change, delete staff users
+- **Sign on**: menu by role
+- **Accounts**: view, change limits and address
+- **Cards**: list, view, block, edit
+- **Transactions**: browse, view, add
+- **Bill payment**: pay a balance in full
+- **Reports**: request for any period
+- **Users**: add, change, delete staff
 ::::
 :::: {.column width="48%"}
 \colhead{At night: the batch cycle}
 
-1. **Posting**: check the day's transactions (card valid? limit? expiry?), post or reject them
-2. **Interest**: monthly interest per account and category
-3. **Combine** the day's and the interest transactions
-4. **Statements**: one per customer, as text and web page
-5. **Reports**: with page, account and grand totals
-6. **Export / import** of all data for another branch
+1. **Posting**: check, post or reject the day's transactions
+2. **Interest**: per account and category
+3. **Combine** daily and interest transactions
+4. **Statements**: per customer, text and web
+5. **Reports**: page, account and grand totals
+6. **Export / import** for another branch
 ::::
 :::
 
@@ -218,11 +218,11 @@ clock**. Anyone can repeat the check with one command (see the live demo).
 
 Kept and documented as *known defects*:
 
-- Interest for the last account is never saved
+- Last account's interest is never saved
 - The report counts the last amount twice
-- A card update resets its security code to 000
-- Saving an account moves its group id into the ZIP-code field
-- Two programs do not compile as shipped
+- Card update resets the security code
+- Account update moves the group id
+- Two programs do not compile
 - ... 12 in total
 ::::
 :::: {.column width="48%"}
@@ -230,10 +230,9 @@ Kept and documented as *known defects*:
 
 Found by running the original, and fixed:
 
-- 9 subtle differences, e.g. unused bytes of a record, or a message cut at 75 instead of 78 characters
-- None was visible in normal tests
-- 8 test-case texts corrected against the original
-- An AI **code review**, scoped by `CLAUDE.md` to the Rust code, found 10 more issues, all fixed with tests
+- 9 subtle differences, none visible in normal tests
+- 8 test-case texts corrected
+- An AI **code review**, scoped by `CLAUDE.md` to the Rust code: 10 more issues, all fixed
 ::::
 :::
 
@@ -247,10 +246,10 @@ Found by running the original, and fixed:
 
 A plain-text file in the repository, read by Claude Code at the start of **every** session:
 
-- **Scope**: what may change, what is read-only
-- **How to build, test and prove** the system
-- **Review policy**: what to review, what never
-- **Lessons learned**: no mistake is repeated
+- **Scope**: what may change
+- **How to build, test, prove**
+- **Review policy**
+- **Lessons learned**
 ::::
 :::: {.column width="48%"}
 \colhead{Excerpt}
@@ -270,7 +269,7 @@ Review only rust/.
 ::::
 :::
 
-\keypoint{Why it matters: one reviewed, versioned rulebook keeps every session and team consistent.}
+\keypoint{One reviewed, versioned rulebook keeps every session consistent.}
 
 ## Human oversight built into the workflow
 
@@ -311,7 +310,7 @@ Review only rust/.
 
 \begin{center}
 \begin{tikzpicture}
-\begin{axis}[xbar, width=10.5cm, height=6cm, bar width=8pt, xmin=0, xmax=190,
+\begin{axis}[xbar, width=10.5cm, height=5.3cm, bar width=8pt, xmin=0, xmax=190,
   xlabel={output tokens (thousands)}, xlabel style={font=\small},
   symbolic y coords={Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
   ytick=data, yticklabel style={font=\small}, xticklabel style={font=\small},
