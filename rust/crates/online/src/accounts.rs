@@ -490,15 +490,13 @@ fn up(v: &[u8]) -> Vec<u8> {
 fn compare_old_new(s: &Acu) -> bool {
     let o = &s.old;
     for (_, k) in MONEY_FIELDS {
-        let (raw, n) = s.new.money.get(k).cloned().unwrap_or_default();
+        let (_, n) = s.new.money.get(k).cloned().unwrap_or_default();
         if n != Some(o.money(k)) {
-            if std::env::var("ACU_DEBUG").is_ok() { eprintln!("DIFF {k}: raw={:?} n={:?} old={}", text::s(&raw), n, o.money(k)); }
             return false;
         }
     }
     let ssn = [s.nv("ssn1"), s.nv("ssn2"), s.nv("ssn3")].concat();
     if ssn != o.get("ssn") {
-        if std::env::var("ACU_DEBUG").is_ok() { eprintln!("DIFF ssn {:?} {:?}", text::s(&ssn), text::s(&o.get("ssn"))); }
         return false;
     }
     let ph = |a: &str, b: &str, cc: &str| -> Vec<u8> { [b"(".to_vec(), s.nv(a), b")".to_vec(), s.nv(b), b"-".to_vec(), s.nv(cc)].concat() };
@@ -507,7 +505,6 @@ fn compare_old_new(s: &Acu) -> bool {
     let mut p2 = vec![b' '; 15];
     text::mv(&mut p2, &ph("ph2a", "ph2b", "ph2c"));
     if up(&p1) != up(&o.get("phone1")) || up(&p2) != up(&o.get("phone2")) {
-        if std::env::var("ACU_DEBUG").is_ok() { eprintln!("DIFF phone {:?} {:?} / {:?} {:?}", text::s(&p1), text::s(&o.get("phone1")), text::s(&p2), text::s(&o.get("phone2"))); }
         return false;
     }
     for (_, k) in SCREEN {
@@ -525,7 +522,6 @@ fn compare_old_new(s: &Acu) -> bool {
         let mut n = vec![b' '; o.get(k).len()];
         text::mv(&mut n, &s.nv(k));
         if up(&n) != up(&o.get(k)) {
-            if std::env::var("ACU_DEBUG").is_ok() { eprintln!("DIFF {k}: new={:?} old={:?}", text::s(&n), text::s(&o.get(k))); }
             return false;
         }
     }

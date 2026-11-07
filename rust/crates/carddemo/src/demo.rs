@@ -104,8 +104,9 @@ fn report(home: &Path, seed: &Path) -> Result<()> {
     let d = JobOpts::default();
     let today = cobol::clock::now().format("%Y-%m-%d").to_string();
     println!("\n  The report lists the transactions processed in a date range (run the nightly batch first).");
-    let start = ask(&format!("  Start date (YYYY-MM-DD) [{}]: ", d.report_start))?.filter(|s| !s.is_empty()).unwrap_or(d.report_start.clone());
-    let end = ask(&format!("  End date (YYYY-MM-DD) [{today}]: "))?.filter(|s| !s.is_empty()).unwrap_or(today);
+    let or_default = |answer: Option<String>, default: String| answer.filter(|s| !s.is_empty()).unwrap_or(default);
+    let start = or_default(ask(&format!("  Start date (YYYY-MM-DD) [{}]: ", d.report_start))?, d.report_start.clone());
+    let end = or_default(ask(&format!("  End date (YYYY-MM-DD) [{today}]: "))?, today);
     let v = open_store(home)?;
     let env = Env { vsam: &v, root: home.to_path_buf(), seed: seed.to_path_buf(), echo: false };
     println!();
@@ -214,7 +215,8 @@ fn view(p: &Path) -> Result<()> {
         t.draw(|f| {
             let [body, foot] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(f.area());
             height = body.height.saturating_sub(2) as usize;
-            let text: Vec<Line> = lines.iter().skip(top).take(height).map(|l| Line::raw(l.chars().skip(left).collect::<String>())).collect();
+            let text: Vec<Line> =
+                lines.iter().skip(top).take(height).map(|l| Line::raw(l.chars().skip(left).collect::<String>())).collect();
             f.render_widget(Paragraph::new(text).block(Block::default().borders(Borders::ALL).title(title.as_str())), body);
             f.render_widget(
                 Paragraph::new(format!(
@@ -248,7 +250,8 @@ fn view(p: &Path) -> Result<()> {
 }
 
 fn clear() {
-    let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All), crossterm::cursor::MoveTo(0, 0));
+    use crossterm::{cursor::MoveTo, terminal};
+    let _ = crossterm::execute!(std::io::stdout(), terminal::Clear(terminal::ClearType::All), MoveTo(0, 0));
 }
 
 /// A line from the keyboard (trimmed); None at the end of input.

@@ -4,8 +4,8 @@ Rust translation of the AWS CardDemo mainframe application (`../cobol/`), by Ill
 
 > **Modification notice (Apache License 2.0, section 4b):** this directory is a derived work of AWS CardDemo,
 > © Amazon.com, Inc. or its affiliates. The COBOL programs, copybooks, BMS maps and JCL were translated into
-> Rust; `crates/cobol/src/copybooks.rs`, `crates/online/src/lookups.rs` and `assets/bms/` are generated from or
-> copied from the original files. Licensed under the Apache License 2.0 (`../LICENSE`, `../NOTICE`).
+> Rust; `crates/cobol/src/copybooks.rs` and `crates/online/src/lookups.rs` are generated from the original
+> files, and the BMS map definitions are read from `../cobol/app/bms` at build time. Licensed under the Apache License 2.0 (`../LICENSE`, `../NOTICE`).
 
 The AWS CardDemo mainframe application (COBOL / CICS / VSAM / JCL), translated to Rust.
 

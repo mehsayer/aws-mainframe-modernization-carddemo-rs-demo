@@ -1,3 +1,6 @@
+//! Unit tests of the VSAM layer: keyed read/write, browsing both ways, EBCDIC key order, rollback, and
+//! the busy-store report.
+
 use super::*;
 
 fn rec(id: &str, acct: &str) -> Vec<u8> {

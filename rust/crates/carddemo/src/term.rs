@@ -136,7 +136,10 @@ extern "C" fn at_exit() {
     if cobridge::in_cobol() {
         use std::io::Write;
         let file = cobridge::sysout_path().map(|p| p.display().to_string()).unwrap_or_else(|| "the COBOL sysout file".into());
-        let _ = writeln!(std::io::stderr(), "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {file}");
+        let _ = writeln!(
+            std::io::stderr(),
+            "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {file}"
+        );
     }
 }
 
@@ -155,9 +158,8 @@ pub fn panic_hook(prev: PanicHook, end: fn(), log: fn(&str) -> bool) -> PanicHoo
             let bt = std::backtrace::Backtrace::capture();
             let bt = if bt.status() == std::backtrace::BacktraceStatus::Captured { format!("\n{bt}") } else { String::new() };
             let name = std::thread::current().name().unwrap_or("<unnamed>").to_string();
-            let logged = log(&format!(
-                "thread '{name}' {info}{bt}\ncarddemo: the bridge ends the task with abend ASRA (or its HANDLE ABEND routine), unless this panic cannot be caught\n"
-            ));
+            let note = "the bridge ends the task with abend ASRA (or its HANDLE ABEND routine), unless this panic cannot be caught";
+            let logged = log(&format!("thread '{name}' {info}{bt}\ncarddemo: {note}\n"));
             #[cfg(unix)]
             abort_note::set(&format!(
                 "carddemo: a panic inside an EXEC CICS command could not be caught and ended the program{}\n",
@@ -256,7 +258,11 @@ mod signals {
             return;
         }
         // the terminal crossterm puts in raw mode (crossterm's tty_fd): stdin if it is one, else /dev/tty
-        let tty = if unsafe { libc::isatty(0) } == 1 { 0 } else { unsafe { libc::open(c"/dev/tty".as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) } };
+        let tty = if unsafe { libc::isatty(0) } == 1 {
+            0
+        } else {
+            unsafe { libc::open(c"/dev/tty".as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) }
+        };
         let mut t: libc::termios = unsafe { std::mem::zeroed() };
         if tty < 0 || unsafe { libc::tcgetattr(tty, &mut t) } != 0 {
             if tty > 0 {
