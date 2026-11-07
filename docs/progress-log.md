@@ -247,3 +247,18 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
 - Checked from the unpacked packages: Linux in a pseudo-terminal (batch, report, viewer, online screens,
   original COBOL screens), Windows under Wine (the same without COBOL); tests/terminal.rs runs the menu in
   the release layout.
+
+### 2026-11-07: README, docs clean-up, Windows icon, code review (high effort), release 1.0.0 updated
+- README: where the COBOL fork comes from (aws-samples/aws-mainframe-modernization-carddemo at 59cc6c2), what the
+  Rust project is and achieved, the documents (Markdown and PDF); AWS's original README kept below it.
+- Docs: the finished online-COBOL plan removed (stale, unreferenced); deck figures updated (5.9 h, 1.2M output
+  tokens, requirements 28 pages / about 170 FRs). Rust: debug prints removed, BMS maps read from cobol/ (the
+  copies in rust/assets removed), module docs, long lines wrapped.
+- Windows: carddemo.exe has an icon (a card with a terminal prompt) and version information (build.rs, windres).
+- A high-effort review agent (read-only) reported 1 high, 4 medium and 12 low findings. Fixed: the signal
+  handlers are put back on every UI start (libcob's start replaced them when the COBOL screens followed the
+  Rust screens in the demo menu); the text-screen cursor no longer underflows; the help line fits 80 columns;
+  `online --cobol` finds the modules shipped next to the program; Rust 1.88 declared as the minimum (checked).
+  The low-priority findings are left for review by the user.
+- Release 1.0.0 rebuilt with stripped programs (Linux 4.8 MB, Windows 6.1 MB) and the icon, tested from the
+  packages on Linux (pty, incl. the original COBOL screens) and Windows (Wine).
