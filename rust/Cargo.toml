@@ -5,6 +5,8 @@ members = ["crates/*"]
 [workspace.package]
 version = "1.0.0"
 edition = "2021"
+# the oldest Rust that builds the workspace with the locked dependencies (checked with 1.88)
+rust-version = "1.88"
 license = "Apache-2.0"
 
 [workspace.dependencies]

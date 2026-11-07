@@ -50,13 +50,16 @@ comparison, from the project folder.
 
 ## Before the audience arrives (presenter, once)
 
-You need three free tools installed: **GnuCOBOL** (runs COBOL outside a mainframe), **Rust** and
-**Python 3**. On this machine they are already installed. On another Linux machine, for example:
+You need three free tools installed: **GnuCOBOL** (runs COBOL outside a mainframe), **Rust** 1.88 or
+newer and **Python 3**. On this machine they are already installed. On another Linux machine, for example:
 
 ```sh
 sudo xbps-install -S gnucobol gmp-devel python3 rustup      # Void Linux
-sudo apt install gnucobol python3 cargo                      # Debian / Ubuntu
+sudo apt install gnucobol python3 curl                       # Debian / Ubuntu, then Rust via rustup:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
+
+(The `cargo` package of Debian and Ubuntu is older than Rust 1.88 and cannot build the project.)
 
 Open a terminal, go to the project folder and build everything once (takes a minute or two):
 
