@@ -204,3 +204,7 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
 - Tests clean up their files; one sample-data helper (`batch::repro::sample_store`, `sample_seed_dir`).
 - Checked in a pseudo-terminal (Rust and --cobol): normal runs, SIGTERM and SIGHUP (terminal restored,
   libcob's message shown), a libcob runtime error, a setup failure.
+- Windows checked under Wine 11.21: the whole test suite passes (the COBOL smoke tests are Linux-only),
+  `carddemo.exe reset`/`batch` run, `online --cobol` refuses with "Linux only"; the full nightly batch from
+  the same sample data gives the same job log, the same 8 output files byte for byte and identical contents
+  in all 11 VSAM datasets as the Linux build.

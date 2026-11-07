@@ -19,6 +19,7 @@ cd rust && cargo build --release && cargo test --workspace     # build + all tes
 cd rust && cargo clippy --workspace --all-targets               # must stay warning-free
 cd rust && CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
   cargo build --release --target x86_64-pc-windows-gnu          # Windows build (NFR-09: Linux and Windows)
+#   same variables + CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER=wine: cargo test --release --target x86_64-pc-windows-gnu --workspace
 python3 rust/difftest/run.py          # compile cobol/ with GnuCOBOL, compare all batch outputs with Rust
 python3 rust/cobridge/cicsprep.py     # translate + compile the original online programs for the CICS bridge
 python3 rust/difftest/online.py       # run the online tests on Rust and on the original COBOL, compare screens
