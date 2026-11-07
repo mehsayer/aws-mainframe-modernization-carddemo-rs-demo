@@ -2,8 +2,8 @@
 # Build the downloadable demo packages of a release (docs/demo-quickstart.md):
 #   rust/target/packages/carddemo-<version>-windows-x86_64.zip     carddemo.exe + sample data (double click)
 #   rust/target/packages/carddemo-<version>-linux-x86_64.tar.gz    carddemo + sample data + COBOL modules
-# Needs: the MinGW-w64 cross compiler (x86_64-w64-mingw32-gcc), zip, GnuCOBOL (for the COBOL modules),
-# pandoc + xelatex (the quick-start PDF).
+# Needs: the MinGW-w64 cross compiler (x86_64-w64-mingw32-gcc, -strip), zip, binutils (strip), GnuCOBOL (for
+# the COBOL modules), pandoc + xelatex (the quick-start PDF). The packaged programs are stripped of symbols.
 set -eu
 cd "$(dirname "$0")/.."
 RS=$(pwd)
@@ -34,23 +34,24 @@ License: Apache-2.0 (LICENSE, NOTICE)
 EOF
 }
 
-stage() { # $1: platform, $2: program file
+stage() { # $1: platform, $2: program file, $3: strip command
   d="$OUT/carddemo-$VERSION-$1-x86_64"
   mkdir -p "$d/data/EBCDIC"
   cp "$2" "$d/"
+  $3 "$d/$(basename "$2")"
   cp "$ROOT"/cobol/app/data/EBCDIC/* "$d/data/EBCDIC/"
   cp "$ROOT/docs/demo-quickstart.pdf" "$ROOT/LICENSE" "$ROOT/NOTICE" "$d/"
   echo "$d"
 }
 
 echo "== windows"
-d=$(stage windows "$RS/target/x86_64-pc-windows-gnu/release/carddemo.exe")
+d=$(stage windows "$RS/target/x86_64-pc-windows-gnu/release/carddemo.exe" x86_64-w64-mingw32-strip)
 readme windows | sed 's/$/\r/' > "$d/README.txt"
 for f in LICENSE NOTICE; do sed -i 's/$/\r/' "$d/$f"; mv "$d/$f" "$d/$f.txt"; done
 (cd "$OUT" && zip -qr "$(basename "$d").zip" "$(basename "$d")")
 
 echo "== linux"
-d=$(stage linux "$RS/target/release/carddemo")
+d=$(stage linux "$RS/target/release/carddemo" strip)
 mkdir -p "$d/cobol-modules"
 cp "$RS"/cobridge/build/modules/*.so "$d/cobol-modules/"
 readme linux > "$d/README.txt"
