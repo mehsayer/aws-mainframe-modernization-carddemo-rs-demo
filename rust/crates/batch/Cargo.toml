@@ -8,5 +8,4 @@ license.workspace = true
 cobol.workspace = true
 vsam.workspace = true
 rust_decimal.workspace = true
-chrono.workspace = true
 anyhow.workspace = true

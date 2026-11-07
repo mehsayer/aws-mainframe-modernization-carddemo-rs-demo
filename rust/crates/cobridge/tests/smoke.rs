@@ -55,3 +55,26 @@ fn cobol_display_goes_to_sysout_file() {
     let text = std::fs::read_to_string(&log).unwrap_or_default();
     assert!(text.contains("PROCESS ENTER KEY"), "sysout file: {text:?}");
 }
+
+/// libcob's error messages (written to the C stream stderr) go to the sysout file too, not to the terminal.
+/// (Its runtime warnings write their `libcob: ` prefix straight to descriptor 2: see set_sysout.)
+#[test]
+fn libcob_messages_go_to_sysout_file() {
+    let _g = COB.lock().unwrap_or_else(|e| e.into_inner());
+    let log = std::env::temp_dir().join(format!("cobridge-warn-{}.log", std::process::id()));
+    let _ = std::fs::remove_file(&log);
+    cobridge::set_sysout(&log).unwrap();
+    let r = region();
+    let mut s = Session::default();
+    r.run(&mut s, Some("CC00"), Aid::Enter); // loads and initialises libcob
+    // cob_runtime_error only prints (ending the run is up to its caller)
+    let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"cob_runtime_error".as_ptr()) };
+    assert!(!sym.is_null(), "libcob loaded with RTLD_GLOBAL");
+    let error: unsafe extern "C" fn(*const std::ffi::c_char, ...) = unsafe { std::mem::transmute(sym) };
+    unsafe {
+        error(c"%s".as_ptr(), c"bridge test error".as_ptr());
+        libc::fflush(std::ptr::null_mut());
+    }
+    let text = std::fs::read_to_string(&log).unwrap_or_default();
+    assert!(text.contains("libcob: ") && text.contains("bridge test error"), "sysout file: {text:?}");
+}

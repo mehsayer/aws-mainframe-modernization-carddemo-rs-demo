@@ -294,8 +294,9 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     region.run(&mut sess, Some(tran), Aid::Enter);
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
 
-    let mut term = tui_start()?;
-    let res = (|| -> Result<()> {
+    // the guard takes the UI off the terminal on every way out: error, normal end, unwinding
+    let (_ui_on, mut term) = tui_start()?;
+    (|| -> Result<()> {
         loop {
             term.draw(|f| draw(f, &sess, &ui))?;
             let Event::Key(k) = event::read()? else { continue };
@@ -325,42 +326,79 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
             }
         }
         Ok(())
-    })();
-    tui_end();
-    res
+    })()
 }
 
 /// Put the UI on the terminal: raw mode and the alternate screen, as `ratatui::try_init()` does, but with
-/// this program's panic hook ([`tui_panic_hook`]) instead of ratatui's.
-fn tui_start() -> Result<ratatui::DefaultTerminal> {
+/// this program's panic hook ([`tui_panic_hook`]) instead of ratatui's. The returned guard takes the UI
+/// off again when dropped, also when a later step of the setup fails.
+fn tui_start() -> Result<(UiOn, ratatui::DefaultTerminal)> {
     use crossterm::{execute, terminal};
     static HOOK: std::sync::Once = std::sync::Once::new();
-    HOOK.call_once(|| std::panic::set_hook(tui_panic_hook(std::panic::take_hook(), tui_end)));
+    HOOK.call_once(|| std::panic::set_hook(tui_panic_hook(std::panic::take_hook(), tui_end, cobridge::write_sysout)));
     terminal::enable_raw_mode()?;
     TUI_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
+    let on = UiOn;
+    // --cobol: libcob writes a few messages straight to descriptor 2; while the UI is on, that is the
+    // sysout file (the UI draws on descriptor 1). tui_end() puts it back.
+    if let Some(fd) = cobridge::sysout_fd() {
+        let saved = unsafe { libc::dup(2) };
+        if saved >= 0 {
+            SAVED_STDERR.store(saved, std::sync::atomic::Ordering::SeqCst);
+            unsafe { libc::dup2(fd, 2) };
+        }
+    }
     execute!(std::io::stdout(), terminal::EnterAlternateScreen)?;
-    Ok(Terminal::new(CrosstermBackend::new(std::io::stdout()))?)
+    Ok((on, Terminal::new(CrosstermBackend::new(std::io::stdout()))?))
 }
 
-/// Take the UI off the terminal, once: whichever comes first (the normal end, the panic hook, the exit
-/// handler) restores it, so a second LeaveAlternateScreen cannot move the cursor over later output.
+/// The UI is on the terminal; dropping this takes it off ([`tui_end`]).
+struct UiOn;
+
+impl Drop for UiOn {
+    fn drop(&mut self) {
+        tui_end();
+    }
+}
+
+/// Take the UI off the terminal, once: whichever comes first (the guard, the panic hook, the exit
+/// handler) puts descriptor 2 back and restores the terminal, so a second LeaveAlternateScreen cannot
+/// move the cursor over later output and panic or exit messages reach the terminal.
 /// Never panics (it runs in a panic hook and an exit handler).
 fn tui_end() {
     if TUI_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        let saved = SAVED_STDERR.swap(-1, std::sync::atomic::Ordering::SeqCst);
+        if saved >= 0 {
+            unsafe {
+                libc::dup2(saved, 2);
+                libc::close(saved);
+            }
+        }
         let _ = ratatui::try_restore();
     }
 }
 
+/// The real descriptor 2 while the UI has it pointed at the COBOL sysout file (-1 otherwise).
+static SAVED_STDERR: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
 type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
 
 /// The UI's panic hook: take the UI off the terminal (`end`), then the earlier hook prints the panic.
-/// Not for a panic inside an EXEC CICS call of the COBOL bridge: the bridge catches it and ends the task
-/// with ASRA while the UI keeps running, and the panic message goes to the sysout file.
-fn tui_panic_hook(prev: PanicHook, end: fn()) -> PanicHook {
+/// Except for a panic the COBOL bridge will catch ([`cobridge::bridge_catches_panic`]): the task ends with
+/// ASRA while the UI keeps running, so the message goes into the sysout file (`log`) instead of over the
+/// screen. A bridge panic that turns into an abort is handled like any other panic.
+fn tui_panic_hook(prev: PanicHook, end: fn(), log: fn(&str) -> bool) -> PanicHook {
     Box::new(move |info| {
-        if !cobridge::in_cdcics() {
-            end();
+        if cobridge::bridge_catches_panic() {
+            let bt = std::backtrace::Backtrace::capture();
+            let bt = if bt.status() == std::backtrace::BacktraceStatus::Captured { format!("\n{bt}") } else { String::new() };
+            let name = std::thread::current().name().unwrap_or("<unnamed>").to_string();
+            if !log(&format!("thread '{name}' {info}{bt}\ncarddemo: the task ends with abend ASRA (or its HANDLE ABEND routine)\n")) {
+                prev(info);
+            }
+            return;
         }
+        end();
         prev(info);
     })
 }
@@ -495,26 +533,22 @@ fn run_submitted(home: &Path, seed: Option<PathBuf>, deck: &[Vec<u8>]) -> String
 }
 
 /// The original COBOL programs on the CICS bridge. Their DISPLAY output and any libcob message go to
-/// `<home>/cobol-sysout.log`; if libcob ends the process (runtime error, STOP RUN), the terminal is
-/// restored on the way out and the user is told where libcob's message is.
+/// `<home>/cobol-sysout.log` (the terminal UI keeps the terminal); if libcob ends the process (runtime
+/// error, STOP RUN), the terminal is restored on the way out and the user is told where libcob's message is.
 fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
     cobridge::check().map_err(anyhow::Error::msg)?;
     cobridge::set_sysout(&home.join("cobol-sysout.log"))?;
-    // Runs at every process exit. stdout/stderr are still redirected to the sysout file exactly when
-    // libcob ends the process from inside a COBOL call: put them back first, take the UI off the terminal
-    // if nothing has yet (normal end and panic hook already have), and name the sysout file only in the
-    // libcob case. Nothing here may panic (no unwinding out of exit).
+    // Runs at every process exit. If a COBOL program is running then, libcob is ending the process
+    // (runtime error, STOP RUN): take the UI off the terminal and say where libcob's message is (the
+    // sysout file). Otherwise the UI is already off. Nothing here may panic (no unwinding out of exit).
     extern "C" fn restore_terminal() {
-        let ended_in_cobol = cobridge::restore_stdio();
-        tui_end();
-        if let Some(file) = ended_in_cobol {
-            use std::io::Write;
-            let _ = writeln!(
-                std::io::stderr(),
-                "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {}",
-                file.display()
-            );
+        if !cobridge::in_cobol() {
+            return;
         }
+        tui_end();
+        use std::io::Write;
+        let file = cobridge::sysout_path().map(|p| p.display().to_string()).unwrap_or_else(|| "the COBOL sysout file".into());
+        let _ = writeln!(std::io::stderr(), "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {file}");
     }
     unsafe { libc::atexit(restore_terminal) };
     Ok(cobridge::region(v))
@@ -528,25 +562,57 @@ mod tests {
 
     static ENDS: AtomicUsize = AtomicUsize::new(0);
     static PRINTS: AtomicUsize = AtomicUsize::new(0);
+    static LOGGED: Mutex<String> = Mutex::new(String::new());
+
+    fn count_end() {
+        ENDS.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn keep_log(text: &str) -> bool {
+        LOGGED.lock().unwrap_or_else(|e| e.into_inner()).push_str(text);
+        true
+    }
 
     #[test]
-    fn panic_hook_takes_the_ui_off_except_for_bridge_panics() {
+    fn panic_hook_keeps_the_ui_for_bridge_panics_only() {
         let saved = std::panic::take_hook();
-        // `end` and the earlier hook only count, so nothing touches the terminal or prints
-        std::panic::set_hook(tui_panic_hook(Box::new(|_| {
-            PRINTS.fetch_add(1, Ordering::SeqCst);
-        }), || {
-            ENDS.fetch_add(1, Ordering::SeqCst);
-        }));
-        let bridge = cobridge::as_cdcics_call(|| panic!("bridge bug"));
+        // `end`, `log` and the earlier hook only record, so nothing touches the terminal or prints
+        std::panic::set_hook(tui_panic_hook(
+            Box::new(|_| {
+                PRINTS.fetch_add(1, Ordering::SeqCst);
+            }),
+            count_end,
+            keep_log,
+        ));
+        let simulated = cobridge::as_cdcics_call(|| panic!("bridge bug"));
         let in_bridge_after = cobridge::in_cdcics();
         let rust = std::panic::catch_unwind(|| panic!("rust bug"));
+        // the real path, through the bridge's CDCICS entry point (needs the COBOL modules)
+        let real = cobridge::check().is_ok().then(|| {
+            let v = vsam::Vsam::open_in_memory().unwrap();
+            batch::repro::reset(&v, &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC")).unwrap();
+            let r = cobridge::region(v);
+            let mut s = Session::default();
+            cobridge::panic_in_next_command();
+            r.run(&mut s, Some("CC00"), Aid::Enter);
+            s.screen.text.unwrap_or_default()
+        });
         std::panic::set_hook(saved);
 
-        assert_eq!(bridge, None::<()>, "the bridge catches its panic");
+        assert_eq!(simulated, None::<()>, "the bridge catches its panic");
         assert!(!in_bridge_after, "in_cdcics() is false again after a bridge panic");
         assert!(rust.is_err());
         assert_eq!(ENDS.load(Ordering::SeqCst), 1, "UI taken off for the Rust panic only");
-        assert_eq!(PRINTS.load(Ordering::SeqCst), 2, "both panics printed by the earlier hook");
+        assert_eq!(PRINTS.load(Ordering::SeqCst), 1, "only the Rust panic printed over the screen");
+        let logged = LOGGED.lock().unwrap().clone();
+        assert!(logged.contains("bridge bug"), "bridge panic logged: {logged:?}");
+        match real {
+            Some(text) => {
+                assert!(text.contains("failed with abend ASRA"), "screen: {text:?}");
+                assert!(logged.contains("test-hooks: EXEC CICS command panics"), "real bridge panic logged: {logged:?}");
+                assert!(!cobridge::in_cobol(), "no COBOL program running afterwards");
+            }
+            None => eprintln!("COBOL modules not built: real ASRA path not tested"),
+        }
     }
 }

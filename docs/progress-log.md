@@ -162,3 +162,24 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
 - `as_cdcics_call` only with cobridge's `test-hooks` feature (carddemo's tests); no unused clock re-export.
 - Checked by hand: the TUI (Rust and --cobol) in a pseudo-terminal enters and leaves the alternate screen
   once and exits cleanly.
+
+### Code review (2026-11-07, fifth `/code-review xhigh`): all 11 findings fixed, sysout redesigned
+- No more descriptor juggling per program call: `set_sysout` points the C streams `stdout`/`stderr`, which
+  libcob uses for DISPLAY and its error messages, at the sysout file, once per process (one stream, switched
+  with `freopen`: an `fclose`d stream made glibc abort at exit, "invalid stdio handle", since libcob keeps
+  it). Rust output (TUI, libtest, panic messages) is not redirected at all. libcob writes a few messages
+  straight to fd 2 (warning prefixes, its signal handler), so the TUI points fd 2 at the sysout file while
+  it is on and puts it back in `tui_end()`. Removed: SysoutRedirect, saved descriptors, restore_stdio,
+  the "ended in COBOL" inference; `cobridge::in_cobol()` says it directly.
+- TUI: a guard from `tui_start()` takes the UI off on every way out, also when the setup fails after raw
+  mode (checked with stdout on /dev/full: terminal restored; before, it stayed raw). The panic hook keeps
+  the UI only for a panic the bridge will catch (`bridge_catches_panic`: the first one of a command; a
+  second one means an abort) and puts that message into the sysout file instead of over the screen.
+- Bridge panics tested through the real CDCICS entry point (test-hooks `panic_in_next_command`): the task
+  ends with ASRA, the UI stays, the message is logged. The ASRA fallback sets the abend directly.
+- online.py: a test run that ends early (libcob runtime error) gets a report section with the end of the
+  COBOL sysout file (checked with CSUTLDTC.so removed: "module 'CSUTLDTC' not found").
+- execute.py: docstring states when out-online-failed is used; an unreadable results.json is a failed run.
+- `modules_dir()` back to one function; unused chrono dependencies removed.
+- Checked in a pseudo-terminal: normal runs (Rust, --cobol) and a libcob runtime error under the TUI (exit 1,
+  UI left once, terminal restored, message naming the sysout file, libcob's message in it).

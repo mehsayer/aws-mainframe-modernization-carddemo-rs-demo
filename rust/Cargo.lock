@@ -102,7 +102,6 @@ name = "batch"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "cobol",
  "rust_decimal",
  "vsam",
@@ -156,7 +155,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "batch",
- "chrono",
  "cics",
  "clap",
  "cobol",

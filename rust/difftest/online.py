@@ -27,14 +27,16 @@ TARGETS = ["manual_suite", "signon", "users", "cards_accounts", "transactions", 
 
 
 TESTS = {}  # target -> region -> test name -> {"result": "ok"|"FAILED", "note": first panic line}
+ENDED_EARLY = []  # report sections for test runs that ended without libtest's summary
 
 
 def run(target, region, logdir):
     print(f"  {target}: {region} ...", file=sys.stderr, flush=True)
     # screen logs: one <test name>.log per test in logdir (the COBOL sysout goes next to it, not into it);
     # absolute module directory for the test binaries, which run in another working directory
+    sysout = logdir.parent / f"{region}-sysout.log"
     env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir), CARDDEMO_COBOL_MODULES=str(cicsprep.modules_dir()),
-               CARDDEMO_COBOL_SYSOUT=str(logdir.parent / f"{region}-sysout.log"))
+               CARDDEMO_COBOL_SYSOUT=str(sysout))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
     r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
@@ -48,7 +50,14 @@ def run(target, region, logdir):
     TESTS.setdefault(target, {})[region] = tests
     m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not m:
-        sys.stderr.write(out[-3000:])
+        # the test process ended early: if libcob ended it (runtime error, STOP RUN), its message is at the
+        # end of the COBOL sysout file, not in the test output
+        tail = sysout.read_text(encoding="latin-1").splitlines()[-15:] if sysout.exists() else []
+        text = out[-3000:] + (f"\n--- end of {sysout}:\n" + "\n".join(tail) if tail else "")
+        sys.stderr.write(text + "\n")
+        ENDED_EARLY.append("\n".join([f"### {target} / {region}: the test run ended early (exit code {r.returncode})",
+                                       "```", *out.splitlines()[-10:],
+                                       *([f"--- end of {sysout.relative_to(OUT)}:"] + tail if tail else []), "```"]))
     return (int(m.group(1)), int(m.group(2))) if m else (0, -1)
 
 
@@ -153,7 +162,7 @@ def main():
     notes = [f"Accepted difference {k + 1}: {ACCEPTED[k][2]}" for k in sorted(USED)]
     md += ["", f"Screens compared: {total_screens}; identical: {same_screens}" +
            (f" (including {len(notes)} accepted compiler difference(s), below)." if notes else "."), ""] + notes + ["",
-           f"**Overall: {'all screens identical, all tests pass on both' if ok else 'differences found'}**", ""] + details
+           f"**Overall: {'all screens identical, all tests pass on both' if ok else 'differences found'}**", ""] + ENDED_EARLY + details
     (OUT / "report.md").write_text("\n".join(md) + "\n")
     (OUT / "results.json").write_text(json.dumps({"ok": ok, "screens": total_screens, "identical": same_screens,
                                                   "tests": TESTS}, indent=1))

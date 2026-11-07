@@ -4,8 +4,10 @@
 - The online and batch cases run as scripted terminal sessions (rust/crates/online/tests/manual_suite.rs).
   They run once, inside rust/difftest/online.py, which runs them on the Rust programs and on the original
   COBOL programs and compares every screen; the Rust results are the execution result, the COBOL run is
-  noted. Without GnuCOBOL, or if the comparison fails, the suite runs on Rust only; a failed comparison
-  run's output is kept in rust/difftest/out-online-failed and TC-DIF-01 is logged as Fail.
+  noted. Screens that differ are a normal result (TC-DIF-01 Fail, report in rust/difftest/out-online).
+  If online.py produces no valid result (a crash, a build error), the suite runs on Rust only, what the
+  failed run left is kept in rust/difftest/out-online-failed and TC-DIF-01 is logged as Fail. Without
+  GnuCOBOL the comparison is not attempted (TC-DIF-01 Not run).
 - TC-BAT-08 runs the batch comparison (rust/difftest/run.py).
 - TC-DIF-01: step 2 is the online comparison; step 1 (an interactive side-by-side session) is manual and is
   not executed by this script, which the log says.
@@ -32,10 +34,14 @@ def run_online(*args):
     if os.path.exists(RESULTS):
         os.remove(RESULTS)
     r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
-    res, why = json.load(open(RESULTS)) if os.path.exists(RESULTS) else None, ""
-    if res is None:
-        why = f"did not complete (exit code {r.returncode})"
-    elif r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok")):
+    res, why = None, f"did not complete (exit code {r.returncode})"
+    if os.path.exists(RESULTS):
+        try:
+            with open(RESULTS) as f:
+                res, why = json.load(f), ""
+        except ValueError:  # cut short while writing
+            why = f"left an unreadable results.json (exit code {r.returncode})"
+    if res is not None and (r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok"))):
         res, why = None, f"exit code {r.returncode} does not match its results"
     if res is None:
         sys.stderr.write(f"online.py {' '.join(args)} {why}:\n{r.stderr[-2000:]}\n")

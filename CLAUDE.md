@@ -60,11 +60,14 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   it. The module directory rule lives in `cicsprep.modules_dir()` (Python users import it) and
   `cobridge::modules_dir()`; cicsprep only ever replaces its own module files there. COBOL DISPLAY
   output and libcob messages go to the file given to `cobridge::set_sysout` (the TUI uses
-  `<home>/cobol-sysout.log`; online tests use `CARDDEMO_COBOL_SYSOUT`, else `target/tmp/cobol-sysout-<test>.log`).
-  `COB_CURRENT_DATE` is set only when `CARDDEMO_NOW` freezes the Rust clock.
+  `<home>/cobol-sysout.log`; online tests use `CARDDEMO_COBOL_SYSOUT`, else `target/tmp/cobol-sysout-<test>.log`)
+  by pointing the C streams `stdout`/`stderr` there; descriptors 1 and 2 stay as they are. libcob writes
+  a few messages straight to fd 2, so the TUI points fd 2 at the sysout file while it is on (one C stream
+  for the process: `freopen`, never `fclose`, as libcob keeps it). `COB_CURRENT_DATE` is set only when
+  `CARDDEMO_NOW` freezes the Rust clock.
 - The bridge installs no panic hook: a panic inside an EXEC CICS call is caught there (ASRA). The TUI owns
-  the one hook (not ratatui's `init()`, which adds its own); it must skip the terminal restore while
-  `cobridge::in_cdcics()`.
+  the one hook (not ratatui's `init()`, which adds its own); it leaves the screen alone only when
+  `cobridge::bridge_catches_panic()`. The exit handler reports a libcob exit when `cobridge::in_cobol()`.
 
 ## Conventions
 

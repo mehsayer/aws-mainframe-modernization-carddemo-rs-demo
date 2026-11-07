@@ -19,7 +19,8 @@ pub fn region() -> Region {
 
 /// Where the COBOL programs' DISPLAY output and libcob messages go, instead of into the test harness
 /// output: `CARDDEMO_COBOL_SYSOUT` (online.py sets it, outside the screen-log directory), else
-/// `target/tmp/cobol-sysout-<test file>.log`, started afresh by each test run.
+/// `target/tmp/cobol-sysout-<test file>.log`, started afresh by each test run. If libcob ends a test
+/// process (runtime error), its message is there, not in the test output.
 fn cobol_sysout() -> PathBuf {
     if let Some(p) = std::env::var_os("CARDDEMO_COBOL_SYSOUT").filter(|v| !v.is_empty()) {
         return PathBuf::from(p);
