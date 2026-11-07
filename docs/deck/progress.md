@@ -54,7 +54,7 @@ header-includes:
 - **40 of 40** batch outputs and **338 of 338** screens identical to the original
 - **41 of 42** test cases passed, the last one's automated part too
 - **15 defects** found in the original and documented
-- About **3 hours** of AI working time, one engineer supervising
+- About **6 hours** of AI working time, one engineer supervising
 ::::
 :::
 
@@ -183,12 +183,12 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 | Screens vs. COBOL | 338 / 338 identical |
 | Manual test cases | 41 / 42 + 1 (step 2) |
 | Defects found in the original | 15 |
-| AI working time | ≈ 3.1 h |
+| AI working time | ≈ 5.9 h |
 ::::
 :::: {.column width="48%"}
 \colhead{Documents produced by the AI}
 
-- Requirements specification: 26 pages, 165 functional requirements
+- Requirements specification: 28 pages, about 170 functional requirements
 - Manual test suite with execution log
 - Live demo guide for non-technical audiences
 - Progress report with time and token figures
@@ -354,7 +354,8 @@ Review only rust/.
 | 2 | Proof against the original COBOL, test execution, fixes | 0.5 h | 137k |
 | 3 | Restructure, demo tooling and guide, `CLAUDE.md`, code-review fixes, this presentation | 0.9 h | 144k |
 | 4 | Original COBOL screens on a CICS stand-in, online comparison, fixes | 0.6 h | 155k |
-| **Total** | | **≈ 3.1 h** | **≈ 0.8M** |
+| 5 | Eight code-review rounds, Windows build, terminal safety, downloadable demos | 2.8 h | 391k |
+| **Total** | | **≈ 5.9 h** | **≈ 1.2M** |
 
 - Measured from the Claude Code session logs (pauses over 10 minutes removed).
 - Token cost depends on the subscription or API price list in use.
@@ -364,17 +365,17 @@ Review only rust/.
 
 \begin{center}
 \begin{tikzpicture}
-\begin{axis}[xbar, width=10.5cm, height=5.3cm, bar width=8pt, xmin=0, xmax=190,
+\begin{axis}[xbar, width=10.5cm, height=5.6cm, bar width=7pt, xmin=0, xmax=460,
   xlabel={output tokens (thousands)}, xlabel style={font=\small},
-  symbolic y coords={Online COBOL bridge,Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
+  symbolic y coords={Reviews + Windows + release,Online COBOL bridge,Restructure + demo + review fixes,Testing,Proof vs. COBOL,Documents,Online screens,Batch jobs,Foundations,Analysis + requirements},
   ytick=data, yticklabel style={font=\small}, xticklabel style={font=\small},
   nodes near coords, nodes near coords style={font=\small}, enlarge y limits=0.08]
-\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (144.0,Restructure + demo + review fixes) (155.0,Online COBOL bridge)};
+\addplot coordinates {(71.0,Analysis + requirements) (45.7,Foundations) (70.2,Batch jobs) (167.1,Online screens) (23.2,Documents) (74.1,Proof vs. COBOL) (53.2,Testing) (144.0,Restructure + demo + review fixes) (155.0,Online COBOL bridge) (391.0,Reviews + Windows + release)};
 \end{axis}
 \end{tikzpicture}
 \end{center}
 
-The online screens were the largest part: 17 interactive programs with many validation rules each.
+Of the translation itself, the online screens were the largest part: 17 interactive programs with many validation rules each. The eight code-review rounds, the Windows build and the downloadable demos that followed took the most of all.
 
 ## Risks and mitigations
 
