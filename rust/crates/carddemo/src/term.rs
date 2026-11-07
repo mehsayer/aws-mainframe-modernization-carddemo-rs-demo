@@ -43,7 +43,7 @@ pub fn install() {
 pub fn start() -> Result<(UiOn, ratatui::DefaultTerminal)> {
     install();
     #[cfg(unix)]
-    signals::install(); // saves the terminal settings: before raw mode
+    signals::install(); // before raw mode (it saves the terminal settings), and after libcob's handlers
     let on = UiOn;
     put_on()?;
     Ok((on, Terminal::new(CrosstermBackend::new(std::io::stdout()))?))
@@ -216,7 +216,8 @@ mod abort_note {
 mod signals {
     use super::{abort_note, stderr_back, ENDING, ON, STATE};
     use std::ffi::c_int;
-    use std::sync::atomic::{AtomicI32, Ordering};
+    use std::cell::UnsafeCell;
+    use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
     use std::sync::OnceLock;
 
     /// Every signal whose default action ends the process, except SIGKILL and SIGSTOP (no handler) and
@@ -249,46 +250,66 @@ mod signals {
     /// The terminal crossterm puts in raw mode, and its settings before raw mode.
     static TTY: AtomicI32 = AtomicI32::new(-1);
     static TERMIOS: OnceLock<libc::termios> = OnceLock::new();
-    /// The actions that were there before ours, per entry of SIGNALS.
-    static PREV: OnceLock<[libc::sigaction; 19]> = OnceLock::new();
 
-    /// Save the terminal settings and install the handlers (once).
+    /// The actions that were there before ours, per entry of SIGNALS: written by `install` only while
+    /// those signals are blocked, read by `on_signal`.
+    struct PrevActions(UnsafeCell<[libc::sigaction; 19]>);
+    unsafe impl Sync for PrevActions {}
+    static PREV: PrevActions = PrevActions(UnsafeCell::new(unsafe { std::mem::zeroed() }));
+    /// Bit i set: PREV holds the earlier action of SIGNALS[i] (ours is installed for it).
+    static HAVE_PREV: AtomicU32 = AtomicU32::new(0);
+
+    fn ours() -> libc::sighandler_t {
+        on_signal as extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void) as libc::sighandler_t
+    }
+
+    /// Save the terminal settings (the first time) and put our handlers in front of whatever handles each
+    /// signal now. Called on every start of the UI: libcob's initialisation installs its own handlers
+    /// over ours, and the demo menu may start a COBOL session after a Rust one in the same process.
     pub fn install() {
-        if PREV.get().is_some() {
-            return;
-        }
-        // the terminal crossterm puts in raw mode (crossterm's tty_fd): stdin if it is one, else /dev/tty
-        let tty = if unsafe { libc::isatty(0) } == 1 {
-            0
-        } else {
-            unsafe { libc::open(c"/dev/tty".as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) }
-        };
-        let mut t: libc::termios = unsafe { std::mem::zeroed() };
-        if tty < 0 || unsafe { libc::tcgetattr(tty, &mut t) } != 0 {
-            if tty > 0 {
-                unsafe { libc::close(tty) };
+        if TERMIOS.get().is_none() {
+            // the terminal crossterm puts in raw mode (crossterm's tty_fd): stdin if it is one, else /dev/tty
+            let tty = if unsafe { libc::isatty(0) } == 1 {
+                0
+            } else {
+                unsafe { libc::open(c"/dev/tty".as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) }
+            };
+            let mut t: libc::termios = unsafe { std::mem::zeroed() };
+            if tty < 0 || unsafe { libc::tcgetattr(tty, &mut t) } != 0 {
+                if tty > 0 {
+                    unsafe { libc::close(tty) };
+                }
+                return; // no terminal: crossterm cannot use raw mode either, nothing to restore
             }
-            return; // no terminal: crossterm cannot use raw mode either, nothing to restore
+            TTY.store(tty, Ordering::SeqCst);
+            let _ = TERMIOS.set(t);
         }
-        TTY.store(tty, Ordering::SeqCst);
-        let _ = TERMIOS.set(t);
-        let mut prev: [libc::sigaction; 19] = unsafe { std::mem::zeroed() };
-        for (i, &sig) in SIGNALS.iter().enumerate() {
-            unsafe { libc::sigaction(sig, std::ptr::null(), &mut prev[i]) };
-        }
-        let _ = PREV.set(prev);
-        for (i, &sig) in SIGNALS.iter().enumerate() {
-            if prev[i].sa_sigaction == libc::SIG_IGN {
-                continue; // ignored (e.g. SIGHUP under nohup, SIGPIPE in Rust): the process goes on, the UI too
+        // no signal may arrive while PREV changes
+        let (mut block, mut old): (libc::sigset_t, libc::sigset_t) = unsafe { (std::mem::zeroed(), std::mem::zeroed()) };
+        unsafe {
+            libc::sigemptyset(&mut block);
+            for &sig in &SIGNALS {
+                libc::sigaddset(&mut block, sig);
             }
+            libc::pthread_sigmask(libc::SIG_BLOCK, &block, &mut old);
+        }
+        for (i, &sig) in SIGNALS.iter().enumerate() {
+            let mut cur: libc::sigaction = unsafe { std::mem::zeroed() };
+            unsafe { libc::sigaction(sig, std::ptr::null(), &mut cur) };
+            if cur.sa_sigaction == ours() || cur.sa_sigaction == libc::SIG_IGN {
+                continue; // ours already; or ignored (SIGHUP under nohup, SIGPIPE in Rust): the UI goes on
+            }
+            unsafe { (*PREV.0.get())[i] = cur };
+            HAVE_PREV.fetch_or(1 << i, Ordering::SeqCst);
             let mut act: libc::sigaction = unsafe { std::mem::zeroed() };
-            act.sa_sigaction = on_signal as extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void) as usize;
+            act.sa_sigaction = ours();
             act.sa_flags = libc::SA_SIGINFO | libc::SA_ONSTACK; // a stack overflow arrives as SIGSEGV
             unsafe {
                 libc::sigemptyset(&mut act.sa_mask);
                 libc::sigaction(sig, &act, std::ptr::null_mut());
             }
         }
+        unsafe { libc::pthread_sigmask(libc::SIG_SETMASK, &old, std::ptr::null_mut()) };
     }
 
     extern "C" fn on_signal(sig: c_int, info: *mut libc::siginfo_t, _ctx: *mut libc::c_void) {
@@ -307,8 +328,8 @@ mod signals {
         // pass it on to the earlier action. A fault raised by the kernel (si_code > 0) recurs when this
         // handler returns, and reaches that action with its real details (Rust's stack-overflow handler
         // looks at the fault address); a signal that was sent (kill, raise, abort) is sent again.
-        if let (Some(prev), Some(i)) = (PREV.get(), SIGNALS.iter().position(|&s| s == sig)) {
-            unsafe { libc::sigaction(sig, &prev[i], std::ptr::null_mut()) };
+        if let Some(i) = SIGNALS.iter().position(|&s| s == sig).filter(|&i| HAVE_PREV.load(Ordering::SeqCst) & (1 << i) != 0) {
+            unsafe { libc::sigaction(sig, &(*PREV.0.get())[i], std::ptr::null_mut()) };
             let kernel_fault = FAULTS.contains(&sig) && !info.is_null() && unsafe { (*info).si_code } > 0;
             if !kernel_fault {
                 unsafe { libc::raise(sig) };
@@ -319,7 +340,7 @@ mod signals {
 
 #[cfg(all(test, debug_assertions))] // the bridge's test seams exist in debug builds only
 mod tests {
-    // The only test in this binary: it replaces the process's panic hook.
+    // The only test in this binary that replaces the process's panic hook (the others must not panic).
     use super::*;
     use cics::{Aid, Session};
     use std::sync::atomic::AtomicUsize;

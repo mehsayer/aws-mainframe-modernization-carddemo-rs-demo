@@ -63,14 +63,9 @@ pub fn exe_dir() -> Option<PathBuf> {
     std::env::current_exe().ok()?.parent().map(Path::to_path_buf)
 }
 
-/// The original COBOL programs: the modules shipped next to the program (Linux release) unless
-/// `CARDDEMO_COBOL_MODULES` says otherwise, and GnuCOBOL's runtime installed.
+/// The original COBOL programs: their modules (shipped next to the program in the Linux release, see
+/// `cobridge::modules_dir`) and GnuCOBOL's runtime installed.
 fn cobol_available() -> Result<(), String> {
-    if std::env::var_os("CARDDEMO_COBOL_MODULES").is_none() {
-        if let Some(m) = exe_dir().map(|d| d.join("cobol-modules")).filter(|m| m.is_dir()) {
-            std::env::set_var("CARDDEMO_COBOL_MODULES", m);
-        }
-    }
     cobridge::check()
 }
 

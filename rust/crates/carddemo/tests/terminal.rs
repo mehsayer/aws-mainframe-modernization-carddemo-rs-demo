@@ -13,6 +13,8 @@ enum Step {
     WaitFor(&'static str),
     /// wait (up to 20 s) until the UI has entered the alternate screen this many times
     UiOn(usize),
+    /// wait (up to 20 s) until the UI has left the alternate screen this many times
+    UiOff(usize),
     Keys(&'static [u8]),
     Signal(c_int),
 }
@@ -152,6 +154,9 @@ fn run_program(prog: &Path, cwd: &Path, args: &[&str], env: &[(&str, String)], s
             }
             Step::UiOn(n) => wait_until(&mut out, "the alternate screen", &|o: &[u8]| {
                 o.windows(8).filter(|w| *w == b"\x1b[?1049h").count() >= *n
+            }),
+            Step::UiOff(n) => wait_until(&mut out, "leaving the alternate screen", &|o: &[u8]| {
+                o.windows(8).filter(|w| *w == b"\x1b[?1049l").count() >= *n
             }),
             Step::Keys(k) => {
                 unsafe { libc::write(master, k.as_ptr().cast(), k.len()) };
@@ -391,4 +396,24 @@ fn demo_menu_as_released() {
     assert_eq!(exit_code(&r), Some(0), "output: {}", strip(&r.out));
     r.assert_restored_after(3); // the viewer twice, the online screens
     assert!(stage.join("carddemo-data/datasets/AWS.M2.CARDDEMO.STATEMNT.PS").is_file(), "data kept next to the program");
+}
+
+#[test]
+fn demo_cobol_after_rust_screens_still_restores_on_a_kill() {
+    // libcob installs its signal handlers when it starts; ours must come back on top when the COBOL
+    // screens follow the Rust screens in the same process (demo menu 1, then 6)
+    let Some(_) = cobol() else { return eprintln!("COBOL modules not built: skipped") };
+    let steps = [
+        Step::WaitFor("Choose:"),
+        Step::Keys(b"1\r"),
+        Step::WaitFor("Sign-on"),
+        Step::Keys(b"\x11"),
+        Step::UiOff(1),
+        Step::Keys(b"6\r"),
+        Step::UiOn(2),
+        Step::Signal(libc::SIGTERM),
+    ];
+    let r = run(&["demo"], &data("cobolafter"), false, &steps);
+    assert!(signal(&r).is_some(), "ended by the signal");
+    r.assert_restored_after(2);
 }

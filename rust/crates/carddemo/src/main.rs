@@ -301,11 +301,14 @@ fn draw(f: &mut Frame, sess: &Session, ui: &Ui) {
             }
         }
     }
-    let help = "Enter  F1-F12=PF1-12  Shift+F1-F12=PF13-24  Esc=Clear  Tab/Shift+Tab  Ctrl+E=EraseEOF  Ctrl+Q=Quit";
+    // at most 80 characters: the line is as wide as the 3270 screen, and Ctrl+Q at its end must show
+    let help = "Enter F1-12=PF1-12 Shift+F1-12=PF13-24 Esc=Clear Tab Ctrl+E=EraseEOF Ctrl+Q=Quit";
     let status = if ui.status.is_empty() { help.to_string() } else { ui.status.clone() };
     let p = Paragraph::new(Line::from(vec![Span::styled(status, Style::default().fg(ratatui::style::Color::DarkGray))]));
     f.render_widget(p, Rect { x: ox, y: (oy + 25).min(area.height.saturating_sub(1)), width: 80.min(area.width), height: 1 });
-    f.set_cursor_position(Position { x: ox + ui.cursor.1 as u16 - 1, y: oy + ui.cursor.0 as u16 - 1 });
+    // the cursor is 1-based; a text screen (SEND TEXT) leaves it at (0, 0): the top left corner then
+    let (row, col) = (ui.cursor.0 as u16, ui.cursor.1 as u16);
+    f.set_cursor_position(Position { x: ox + col.saturating_sub(1), y: oy + row.saturating_sub(1) });
 }
 
 fn unprotected(s: &cics::Screen) -> Vec<usize> {
@@ -518,4 +521,27 @@ fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
     // libcob now, before the UI: its signal handlers must be in place before the UI adds its own
     cobridge::start().map_err(anyhow::Error::msg)?;
     Ok(cobridge::region(v))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rendered(sess: &Session, width: u16) -> Vec<String> {
+        let mut t = Terminal::new(ratatui::backend::TestBackend::new(width, 26)).unwrap();
+        let ui = Ui { cursor: sess.screen.cursor, status: String::new() };
+        t.draw(|f| draw(f, sess, &ui)).unwrap();
+        let buf = t.backend().buffer();
+        (0..buf.area.height).map(|y| (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect()).collect()
+    }
+
+    #[test]
+    fn text_screen_in_an_80_column_terminal() {
+        // a SEND TEXT screen leaves the cursor at (0, 0): drawing it must not underflow (debug builds panicked)
+        let text = Some("DFHAC2001 Transaction 'XXXX' is not recognized.".to_string());
+        let sess = Session { screen: cics::Screen { text, ..Default::default() }, ..Default::default() };
+        let lines = rendered(&sess, 80);
+        assert!(lines[0].starts_with("DFHAC2001"), "text at the top left: {:?}", lines[0]);
+        assert!(lines[25].trim_end().ends_with("Ctrl+Q=Quit"), "the whole help line fits 80 columns: {:?}", lines[25]);
+    }
 }

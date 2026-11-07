@@ -144,16 +144,17 @@ const EIB_CDCICS: usize = 67;
 const EIB_LEN: usize = 75;
 
 /// Directory of the compiled COBOL modules: a non-empty `CARDDEMO_COBOL_MODULES` made absolute against the
-/// current directory (symlinks and `..` kept, as the OS will resolve them; as given if that fails), else
-/// the build output. Same rule as `modules_dir()` in cobridge/cicsprep.py.
+/// current directory (symlinks and `..` kept, as the OS will resolve them; as given if that fails); else
+/// `cobol-modules` next to the running program, if there is one (the Linux release package); else the
+/// build output in the source tree. The first and last are the rule of `modules_dir()` in
+/// cobridge/cicsprep.py, which builds the modules; the release layout only matters for running them.
 pub fn modules_dir() -> PathBuf {
-    match std::env::var_os("CARDDEMO_COBOL_MODULES").filter(|v| !v.is_empty()) {
-        Some(v) => {
-            let given = PathBuf::from(v);
-            std::path::absolute(&given).unwrap_or(given)
-        }
-        None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cobridge/build/modules"),
+    if let Some(v) = std::env::var_os("CARDDEMO_COBOL_MODULES").filter(|v| !v.is_empty()) {
+        let given = PathBuf::from(v);
+        return std::path::absolute(&given).unwrap_or(given);
     }
+    let released = std::env::current_exe().ok().and_then(|e| Some(e.parent()?.join("cobol-modules"))).filter(|d| d.is_dir());
+    released.unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cobridge/build/modules"))
 }
 
 /// True when the COBOL modules have been built (`python3 rust/cobridge/cicsprep.py`).

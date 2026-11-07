@@ -63,7 +63,8 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
 - `rust/crates/cobridge` loads GnuCOBOL's libcob at run time (dlopen; `CARDDEMO_LIBCOB` names the exact
   library, with no fallback), so every build works without GnuCOBOL; only running the COBOL programs needs
   it. The module directory rule lives in `cicsprep.modules_dir()` (Python users import it) and
-  `cobridge::modules_dir()`; cicsprep only ever replaces its own module files there. COBOL DISPLAY
+  `cobridge::modules_dir()`, which also finds the release layout (`cobol-modules` next to the program);
+  cicsprep only ever replaces its own module files there. COBOL DISPLAY
   output and libcob messages go to the file given to `cobridge::set_sysout` (the TUI uses
   `<home>/cobol-sysout.log`; online tests use `CARDDEMO_COBOL_SYSOUT`, else `target/tmp/cobol-sysout-<test>.log`)
   by pointing the C streams `stdout`/`stderr` there; descriptors 1 and 2 stay as they are. libcob writes
