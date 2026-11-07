@@ -16,7 +16,7 @@ fn fresh_store(name: &str) -> PathBuf {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("carddemo.db");
     let v = vsam::Vsam::open(&db).unwrap();
-    let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
+    let seed = batch::repro::sample_seed_dir();
     batch::repro::reset(&v, &seed).unwrap();
     db
 }

@@ -50,13 +50,15 @@ def run(target, region, logdir):
     TESTS.setdefault(target, {})[region] = tests
     m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not m:
-        # the test process ended early: if libcob ended it (runtime error, STOP RUN), its message is at the
-        # end of the COBOL sysout file, not in the test output
-        tail = sysout.read_text(encoding="latin-1").splitlines()[-15:] if sysout.exists() else []
-        text = out[-3000:] + (f"\n--- end of {sysout}:\n" + "\n".join(tail) if tail else "")
-        sys.stderr.write(text + "\n")
-        ENDED_EARLY.append("\n".join([f"### {target} / {region}: the test run ended early (exit code {r.returncode})",
-                                       "```", *out.splitlines()[-10:],
+        built = not re.search(r"^error(\[E\d+\])?: |^error: could not compile", out, re.M)
+        # a test process that ended early: if libcob ended it (runtime error, STOP RUN), its message is at
+        # the end of the COBOL sysout file, not in the test output (a build error has nothing there)
+        tail = sysout.read_text(encoding="latin-1").splitlines()[-15:] if built and sysout.exists() else []
+        what = "the test run ended early" if built else "the tests did not build"
+        lines = out.splitlines()
+        shown = lines[-10:] if built else [l for l in lines if l.startswith(("error", "  -->"))][:20]
+        sys.stderr.write(out[-3000:] + (f"\n--- end of {sysout}:\n" + "\n".join(tail) if tail else "") + "\n")
+        ENDED_EARLY.append("\n".join([f"### {target} / {region}: {what} (exit code {r.returncode})", "```", *shown,
                                        *([f"--- end of {sysout.relative_to(OUT)}:"] + tail if tail else []), "```"]))
     return (int(m.group(1)), int(m.group(2))) if m else (0, -1)
 

@@ -4,7 +4,7 @@ use common::*;
 
 fn post_daily(r: &cics::Region) {
     // give the transaction master some content: run the posting program
-    let seed = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
+    let seed = batch::repro::sample_seed_dir();
     let root = std::env::temp_dir().join(format!("carddemo-online-{}", std::process::id()));
     let env = batch::jobs::Env { vsam: &r.vsam, root, seed, echo: false };
     batch::jobs::run_job(&env, "POSTTRAN", &batch::jobs::JobOpts::default()).unwrap();

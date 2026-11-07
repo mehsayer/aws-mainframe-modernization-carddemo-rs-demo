@@ -10,7 +10,7 @@
 | NFR-06 | **Multi-user.** Several terminal sessions can run against the same data store at the same time. Record locking makes READ UPDATE / REWRITE safe. |
 | NFR-07 | **Batch operation.** Each JCL job is available as a named job run from the command line, with the same step order, condition-code handling and return codes (0, 4, abend 999 → non-zero exit). |
 | NFR-08 | **Demonstrability.** One command resets the data store to the shipped sample data. A scripted demo (sign-on, browse, update, posting run, report) completes in under 10 minutes. The application starts in under 1 second. |
-| NFR-09 | **Portability.** The system builds with stable Rust on Linux, macOS and Windows. It needs no mainframe, CICS, VSAM or COBOL runtime. SQLite is embedded. |
+| NFR-09 | **Portability.** The system builds with stable Rust on Linux and Windows. It needs no mainframe, CICS, VSAM or COBOL runtime. SQLite is embedded. Running the original COBOL programs for comparison (`--cobol`, the differential tests) needs GnuCOBOL and Linux. |
 | NFR-10 | **Traceability.** Each Rust program module names the COBOL program it replaces. Its functions are named after the original paragraphs. |
 | NFR-11 | **Security parity.** Passwords are stored and compared in plain text and upper case, as in the original (USRSEC). This is a known weakness kept for fidelity, and the deployment must treat the data store as sensitive. |
 | NFR-12 | **Observability.** Batch programs write their DISPLAY output to stdout and the job log, as SYSOUT did. Online abends are logged with the program name and abend code. |

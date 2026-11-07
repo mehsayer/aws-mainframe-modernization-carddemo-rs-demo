@@ -29,8 +29,9 @@ FAILED = os.path.join(RS, "difftest", "out-online-failed")  # a failed compariso
 
 def run_online(*args):
     """Run online.py: (its results.json or None if this run did not produce a valid one, why not, its output).
-    online.py writes results.json last (also when screens differ, with exit code 1), and an earlier run's
-    file is removed first, so a file found afterwards is this run's."""
+    online.py writes results.json last (also when screens differ, with exit code 1). An earlier run's file is
+    removed here first, not left to online.py: online.py clears its output only once it runs, and an import
+    error or a crash before that would leave the old file looking like this run's result."""
     if os.path.exists(RESULTS):
         os.remove(RESULTS)
     r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
@@ -63,12 +64,18 @@ if not no_cobol:
         with open(os.path.join(FAILED, "output.txt"), "w") as f:
             f.write(output)
 if online is None:  # no GnuCOBOL, or the comparison failed: the same tests on Rust only (same parser and format)
-    rust_run, why, _ = run_online("--rust-only")
+    rust_run, why, output = run_online("--rust-only")
+    # rust-only writes no report: keep its output (a crashed or unbuilt test binary is explained there)
+    os.makedirs(OUT_ONLINE, exist_ok=True)
+    with open(os.path.join(OUT_ONLINE, "output.txt"), "w") as f:
+        f.write(output)
     if rust_run is None:
-        sys.exit(f"the scripted test suite could not run: online.py --rust-only {why}")
+        sys.exit(f"the scripted test suite could not run: online.py --rust-only {why}; see rust/difftest/out-online/output.txt")
     tests = rust_run["tests"].get("manual_suite", {})
+    details = "rust/difftest/out-online/output.txt"
 else:
     tests = online["tests"].get("manual_suite", {})
+    details = "rust/difftest/out-online/report.md"
 rust_tests, cobol_tests = tests.get("rust", {}), tests.get("cobol", {})
 
 d = subprocess.run([sys.executable, os.path.join(RS, "difftest", "run.py")], cwd=RS, capture_output=True, text=True)
@@ -95,12 +102,14 @@ for c in CASES:
     key = cid.lower().replace("-", "_")
     t = rust_tests.get(key)
     if t is None:
-        res[cid] = {"result": "Not run", "notes": ""}
+        res[cid] = {"result": "Not run", "notes": f"no result from the scripted run; see {details}"}
         continue
     note = t.get("note") or "scripted terminal"
     cb = cobol_tests.get(key)
     if cb:
         note += "; same case on the original COBOL: " + ("passes" if cb["result"] == "ok" else "FAILS")
+    if t["result"] != "ok":
+        note += f"; see {details}"
     res[cid] = {"result": "Pass" if t["result"] == "ok" else "Fail", "notes": note}
 json.dump({"date": today, "tester": "Claude Code (scripted)", "results": res},
           open(os.path.join(HERE, "results.json"), "w"), indent=1)

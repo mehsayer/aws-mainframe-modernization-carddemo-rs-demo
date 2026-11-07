@@ -6,9 +6,7 @@ use std::path::PathBuf;
 /// COBOL programs on the CICS bridge (run those tests with `--test-threads=1`: libcob is single-threaded).
 pub fn region() -> Region {
     std::env::set_var("CARDDEMO_NOW", "2022-07-18T10:11:12.34");
-    let v = vsam::Vsam::open_in_memory().unwrap();
-    let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
-    batch::repro::reset(&v, &seed).unwrap();
+    let v = batch::repro::sample_store().unwrap();
     if cobol_region() {
         cobridge::set_sysout(&cobol_sysout()).expect("cobol sysout file");
         cobridge::region(v)

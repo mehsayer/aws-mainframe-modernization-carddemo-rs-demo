@@ -17,6 +17,8 @@ Same screens, messages, record bytes and reports as the original, including its 
 ```sh
 cd rust && cargo build --release && cargo test --workspace     # build + all tests
 cd rust && cargo clippy --workspace --all-targets               # must stay warning-free
+cd rust && CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
+  cargo build --release --target x86_64-pc-windows-gnu          # Windows build (NFR-09: Linux and Windows)
 python3 rust/difftest/run.py          # compile cobol/ with GnuCOBOL, compare all batch outputs with Rust
 python3 rust/cobridge/cicsprep.py     # translate + compile the original online programs for the CICS bridge
 python3 rust/difftest/online.py       # run the online tests on Rust and on the original COBOL, compare screens
@@ -65,9 +67,13 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   a few messages straight to fd 2, so the TUI points fd 2 at the sysout file while it is on (one C stream
   for the process: `freopen`, never `fclose`, as libcob keeps it). `COB_CURRENT_DATE` is set only when
   `CARDDEMO_NOW` freezes the Rust clock.
-- The bridge installs no panic hook: a panic inside an EXEC CICS call is caught there (ASRA). The TUI owns
-  the one hook (not ratatui's `init()`, which adds its own); it leaves the screen alone only when
-  `cobridge::bridge_catches_panic()`. The exit handler reports a libcob exit when `cobridge::in_cobol()`.
+- The bridge installs no panic hook: a panic inside an EXEC CICS call is caught there (ASRA). The TUI
+  (`crates/carddemo/src/term.rs`) owns the one hook (not ratatui's `init()`, which adds its own), the exit
+  handler and the fatal-signal handlers, and takes the UI off exactly once on every way out. Its hook
+  calls `cobridge::note_panic()` once per panic; the exit handler reports a libcob exit when
+  `cobridge::in_cobol()`. `cobridge::start()` (libcob's own signal handlers) comes before the UI's.
+- Platforms: Linux and Windows (NFR-09; macOS and musl are not targets). The COBOL bridge runs on Linux
+  (glibc) only; on Windows it builds and reports that it is not supported.
 
 ## Conventions
 

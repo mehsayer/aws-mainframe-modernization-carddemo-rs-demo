@@ -1,6 +1,6 @@
-//! Phase 2: the original COBOL sign-on and menu programs run on the bridge.
+//! Phase 2: the original COBOL sign-on and menu programs run on the bridge (GnuCOBOL; the bridge runs on Linux).
+#![cfg(unix)]
 use cics::{Aid, Region, Session};
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 /// libcob is not thread-safe: COBOL tasks run one at a time.
@@ -8,10 +8,7 @@ static COB: Mutex<()> = Mutex::new(());
 
 fn region() -> Region {
     std::env::set_var("CARDDEMO_NOW", "2022-07-18T10:11:12.34");
-    let v = vsam::Vsam::open_in_memory().unwrap();
-    let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
-    batch::repro::reset(&v, &seed).unwrap();
-    cobridge::region(v)
+    cobridge::region(batch::repro::sample_store().unwrap())
 }
 
 fn field(s: &Session, n: &str) -> String {
@@ -36,6 +33,7 @@ fn cobol_signon_and_menu() {
 }
 
 /// COBOL DISPLAY output goes to the sysout file, not to the terminal (CORPT00C DISPLAYs on Enter).
+#[cfg(all(target_os = "linux", target_env = "gnu"))] // set_sysout
 #[test]
 fn cobol_display_goes_to_sysout_file() {
     let _g = COB.lock().unwrap_or_else(|e| e.into_inner());
@@ -53,11 +51,13 @@ fn cobol_display_goes_to_sysout_file() {
     assert_eq!(s.screen.map, "CORPT0A");
     r.run(&mut s, None, Aid::Enter);
     let text = std::fs::read_to_string(&log).unwrap_or_default();
+    let _ = std::fs::remove_file(&log); // the stream stays open on the unlinked file: nothing else reads it
     assert!(text.contains("PROCESS ENTER KEY"), "sysout file: {text:?}");
 }
 
 /// libcob's error messages (written to the C stream stderr) go to the sysout file too, not to the terminal.
 /// (Its runtime warnings write their `libcob: ` prefix straight to descriptor 2: see set_sysout.)
+#[cfg(all(target_os = "linux", target_env = "gnu"))] // set_sysout
 #[test]
 fn libcob_messages_go_to_sysout_file() {
     let _g = COB.lock().unwrap_or_else(|e| e.into_inner());
@@ -76,5 +76,6 @@ fn libcob_messages_go_to_sysout_file() {
         libc::fflush(std::ptr::null_mut());
     }
     let text = std::fs::read_to_string(&log).unwrap_or_default();
+    let _ = std::fs::remove_file(&log);
     assert!(text.contains("libcob: ") && text.contains("bridge test error"), "sysout file: {text:?}");
 }

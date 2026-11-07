@@ -1,5 +1,4 @@
 use batch::jobs::{run_job, Env, JobOpts};
-use std::path::PathBuf;
 
 #[test]
 fn full_batch_cycle() {
@@ -8,7 +7,7 @@ fn full_batch_cycle() {
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
     let v = vsam::Vsam::open(root.join("carddemo.db")).unwrap();
-    let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
+    let seed = batch::repro::sample_seed_dir();
     batch::repro::reset(&v, &seed).unwrap();
     let env = Env { vsam: &v, root: root.clone(), seed, echo: false };
     let o = JobOpts { report_end: "2022-07-31".into(), ..JobOpts::default() };

@@ -183,3 +183,24 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
 - `modules_dir()` back to one function; unused chrono dependencies removed.
 - Checked in a pseudo-terminal: normal runs (Rust, --cobol) and a libcob runtime error under the TUI (exit 1,
   UI left once, terminal restored, message naming the sysout file, libcob's message in it).
+
+### Code review (2026-11-07, sixth `/code-review xhigh`): all 13 findings fixed; platforms Linux and Windows
+- Platforms (decided by the user): Linux and Windows; macOS and musl dropped (NFR-09 updated). The sysout
+  capture (glibc's assignable `stdout`/`stderr`) and the COBOL bridge are Linux-only; on Windows cobridge
+  builds and reports "Linux only". The Windows build had been broken since the bridge started using dlopen;
+  it now builds and links with MinGW (`x86_64-pc-windows-gnu`, command in CLAUDE.md).
+- The terminal handling moved to `crates/carddemo/src/term.rs`: the exit handler takes the UI off on any
+  exit while it is on (the libcob message only when `cobridge::in_cobol()`); fatal-signal handlers (TERM,
+  HUP, INT, QUIT, ABRT, SEGV, BUS, FPE, ILL; not ignored ones) restore the terminal with async-signal-safe
+  calls and pass the signal on to libcob's or the default handler, so `kill` no longer leaves a raw terminal
+  and libcob's "termination (signal)" reaches it. `cobridge::start()` initialises libcob before the UI;
+  the UI starts before the first transaction. dup/dup2 failures are errors.
+- `cobridge::note_panic()` (renamed: a hook calls it once per panic); `write_sysout` survives a poisoned
+  lock; `send_to_sysout` does the dup2 under the lock; one flush of the sysout stream per task;
+  `set_sysout` with the same path does nothing.
+- execute.py keeps the --rust-only output (out-online/output.txt) and points failing cases at it; it still
+  removes an old results.json itself (online.py may fail before it clears its output). online.py reports
+  build errors as such.
+- Tests clean up their files; one sample-data helper (`batch::repro::sample_store`, `sample_seed_dir`).
+- Checked in a pseudo-terminal (Rust and --cobol): normal runs, SIGTERM and SIGHUP (terminal restored,
+  libcob's message shown), a libcob runtime error, a setup failure.

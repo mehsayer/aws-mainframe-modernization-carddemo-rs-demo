@@ -17,10 +17,14 @@ use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, Once, OnceLock};
+use std::sync::{Once, OnceLock};
 use vsam::{Browse, Resp};
 
-use libc::{dlerror, dlopen, dlsym, fflush, RTLD_GLOBAL, RTLD_NOW};
+#[cfg(unix)]
+use libc::{dlerror, dlopen, dlsym, RTLD_GLOBAL, RTLD_NOW};
+
+mod sysout;
+pub use sysout::{send_to_sysout, set_sysout, sysout_path, write_sysout};
 
 /// The GnuCOBOL runtime functions the bridge uses. libcob is loaded at run time (dlopen), so nothing in
 /// the workspace needs GnuCOBOL to build; only running the COBOL programs does.
@@ -38,6 +42,7 @@ struct Cob {
 
 static COB: OnceLock<Result<Cob, String>> = OnceLock::new();
 
+#[cfg(unix)]
 fn last_dl_error() -> String {
     let e = unsafe { dlerror() };
     if e.is_null() {
@@ -49,11 +54,12 @@ fn last_dl_error() -> String {
 
 /// libcob: exactly `CARDDEMO_LIBCOB` when it is set (no fallback: it must match the cobc that built the
 /// modules), else the usual shared-library names. The loader's own message is reported on failure.
+#[cfg(unix)]
 fn load_cob() -> Result<Cob, String> {
     let explicit = std::env::var("CARDDEMO_LIBCOB").ok().filter(|v| !v.is_empty());
     let names: Vec<String> = match &explicit {
         Some(p) => vec![p.clone()],
-        None => ["libcob.so.4", "libcob.so", "libcob.dylib"].map(String::from).to_vec(),
+        None => ["libcob.so.4", "libcob.so"].map(String::from).to_vec(),
     };
     let mut handle = std::ptr::null_mut();
     let mut errors = Vec::new();
@@ -95,88 +101,14 @@ fn load_cob() -> Result<Cob, String> {
     }
 }
 
+/// GnuCOBOL's runtime is only loaded on Unix systems (the bridge runs on Linux; Windows builds without it).
+#[cfg(not(unix))]
+fn load_cob() -> Result<Cob, String> {
+    Err("the COBOL programs run on Linux only (GnuCOBOL's libcob)".into())
+}
+
 fn cob() -> &'static Cob {
     COB.get_or_init(load_cob).as_ref().expect("libcob checked by cobridge::check()")
-}
-
-// The C library's standard streams. glibc exports them as variables that may be assigned; libcob writes
-// DISPLAY output and its messages through them.
-extern "C" {
-    #[link_name = "stdout"]
-    static mut C_STDOUT: *mut libc::FILE;
-    #[link_name = "stderr"]
-    static mut C_STDERR: *mut libc::FILE;
-}
-
-/// The sysout file: a C stream, and its path for messages that point the user to it.
-struct Sysout {
-    file: *mut libc::FILE,
-    path: PathBuf,
-}
-
-// The stream is only used under the lock (and by libcob, which runs one program at a time).
-unsafe impl Send for Sysout {}
-
-static SYSOUT: Mutex<Option<Sysout>> = Mutex::new(None);
-
-fn sysout() -> std::sync::MutexGuard<'static, Option<Sysout>> {
-    SYSOUT.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-/// Send the COBOL programs' output to `path` (appended), for the rest of the process: DISPLAY and libcob's
-/// error messages, which libcob writes through the C streams `stdout` and `stderr`. Those two stream
-/// variables are pointed at the file; the process's descriptors 1 and 2 are not touched, so Rust output
-/// (a terminal UI, a test harness, panic messages) still goes where it went. A few libcob messages are
-/// written straight to descriptor 2 (the `libcob: ` prefix of runtime warnings, the message of its
-/// signal handler): a full-screen UI points descriptor 2 at [`sysout_fd`] while it is on. Calling it
-/// again switches to another file: the same C stream is reopened there (never closed, as libcob may
-/// hold on to the stream it was given).
-pub fn set_sysout(path: &std::path::Path) -> std::io::Result<()> {
-    use std::os::unix::ffi::OsStrExt;
-    let name = CString::new(path.as_os_str().as_bytes()).map_err(std::io::Error::other)?;
-    let mut st = sysout();
-    let file = match st.as_ref() {
-        Some(s) => unsafe {
-            fflush(s.file);
-            libc::freopen(name.as_ptr(), c"a".as_ptr(), s.file)
-        },
-        None => unsafe { libc::fopen(name.as_ptr(), c"a".as_ptr()) },
-    };
-    if file.is_null() {
-        // a failed freopen has closed the stream: forget it (the C stream variables still point at it,
-        // so libcob's output is lost until the next successful call)
-        let err = std::io::Error::last_os_error();
-        *st = None;
-        return Err(err);
-    }
-    unsafe {
-        C_STDOUT = file;
-        C_STDERR = file;
-    }
-    *st = Some(Sysout { file, path: path.to_path_buf() });
-    Ok(())
-}
-
-/// The descriptor of the sysout file, if any (for a UI that sends descriptor 2 there while it is on).
-pub fn sysout_fd() -> Option<c_int> {
-    sysout().as_ref().map(|s| unsafe { libc::fileno(s.file) })
-}
-
-/// The file given to [`set_sysout`], if any.
-pub fn sysout_path() -> Option<PathBuf> {
-    sysout().as_ref().map(|s| s.path.clone())
-}
-
-/// Append `text` to the sysout file (flushed). False if there is none, or if another thread holds it
-/// (never blocks: a panic hook calls this).
-pub fn write_sysout(text: &str) -> bool {
-    let Ok(st) = SYSOUT.try_lock() else { return false };
-    let Some(s) = st.as_ref() else { return false };
-    unsafe {
-        libc::fwrite(text.as_ptr().cast(), 1, text.len(), s.file);
-        fflush(s.file);
-    }
-    true
 }
 
 /// True while a COBOL program (or libcob's initialisation) runs.
@@ -189,12 +121,11 @@ pub fn in_cobol() -> bool {
     IN_COBOL.load(Ordering::SeqCst)
 }
 
-/// Run `f` (a libcob call) with [`in_cobol`] true, and flush the COBOL output afterwards.
+/// Run `f` (a libcob call) with [`in_cobol`] true.
 fn cobol<R>(f: impl FnOnce() -> R) -> R {
     IN_COBOL.store(true, Ordering::SeqCst);
     let r = f();
     IN_COBOL.store(false, Ordering::SeqCst);
-    unsafe { fflush(std::ptr::null_mut()) };
     r
 }
 
@@ -242,6 +173,15 @@ pub fn check() -> Result<(), String> {
 }
 
 static INIT: Once = Once::new();
+
+/// Check and initialise the COBOL runtime now (otherwise the first program call does it). libcob installs
+/// its signal handlers here: a UI that adds its own (to restore the terminal) calls this first, so that its
+/// handlers run first and then pass the signal on to libcob's.
+pub fn start() -> Result<(), String> {
+    check()?;
+    init();
+    Ok(())
+}
 
 fn init() {
     INIT.call_once(|| {
@@ -309,7 +249,7 @@ fn pack7(v: u32) -> [u8; 4] {
 pub fn run(t: &mut Task) -> Cr {
     init();
     let name = CString::new(t.program.trim()).expect("program name");
-    if unsafe { (cob().resolve)(name.as_ptr()) }.is_null() {
+    if cobol(|| unsafe { (cob().resolve)(name.as_ptr()) }).is_null() {
         return Err(Transfer::Abend("APCT".into()));
     }
     let now = cobol::clock::now();
@@ -342,6 +282,7 @@ pub fn run(t: &mut Task) -> Cr {
     // CICS gives every task a fresh copy of WORKING-STORAGE; a CALLed GnuCOBOL program keeps its state
     // (and any PERFORM return addresses left by a HANDLE CONDITION GO TO) until it is cancelled
     cobol(|| unsafe { (cob().cancel)(name.as_ptr()) });
+    sysout::flush();
     CTX.with(|c| c.set(prev));
     match ctx.transfer.take() {
         Some(tr) => Err(tr),
@@ -482,7 +423,7 @@ fn cond_abend(resp: i32) -> String {
 thread_local! {
     /// True while this thread runs a `CDCICS` call (see [`in_cdcics`]).
     static IN_CDCICS: Cell<bool> = const { Cell::new(false) };
-    /// Panics of the current `CDCICS` call not yet caught (see [`bridge_catches_panic`]).
+    /// Panics of the current `CDCICS` call not yet caught (see [`note_panic`]).
     static PANICS: Cell<u32> = const { Cell::new(0) };
 }
 
@@ -491,12 +432,13 @@ pub fn in_cdcics() -> bool {
     IN_CDCICS.with(|c| c.get())
 }
 
-/// For a panic hook, once per panic: true if the bridge will catch this panic, i.e. it happens inside an
-/// EXEC CICS command and is the only one in flight there. The task then ends with ASRA while the UI keeps
-/// running, so a TUI's hook must leave the terminal alone (and may put the message into the sysout file,
-/// [`write_sysout`]). A second panic before the first is caught (a destructor panicking during the
-/// unwind) aborts the process: false then. The bridge installs no panic hook itself.
-pub fn bridge_catches_panic() -> bool {
+/// To be called by the process's panic hook, exactly once per panic (it counts them): true if the bridge
+/// will catch this panic, i.e. it happens inside an EXEC CICS command and is the only one in flight there.
+/// The task then ends with ASRA while the UI keeps running, so a TUI's hook must leave the terminal alone
+/// (and may put the message into the sysout file, [`write_sysout`]). A second panic before the first is
+/// caught (a destructor panicking during the unwind) aborts the process: false then. Only a hook can count
+/// them, as only a hook sees a panic when it starts; the bridge installs no panic hook itself.
+pub fn note_panic() -> bool {
     if !in_cdcics() {
         return false;
     }
@@ -865,49 +807,15 @@ fn receive_map(t: &mut Task, c: &Cmd) -> Out {
 mod tests {
     use super::*;
 
-    /// Device and inode of fd 1: which file it really points at.
-    fn stdout_id() -> (u64, u64) {
-        let mut st: libc::stat = unsafe { std::mem::zeroed() };
-        assert_eq!(unsafe { libc::fstat(1, &mut st) }, 0);
-        (st.st_dev as u64, st.st_ino as u64)
-    }
-
     #[test]
     fn only_the_first_panic_of_a_command_is_caught() {
-        assert!(!bridge_catches_panic(), "outside a command");
-        let seen = guarded(|| (bridge_catches_panic(), bridge_catches_panic()));
+        assert!(!note_panic(), "outside a command");
+        let seen = guarded(|| (note_panic(), note_panic()));
         assert_eq!(seen, Some((true, false)), "a second panic in flight means an abort");
         // a caught panic is over: the next one (here in a new command) is caught again
         let panicked = guarded(|| -> bool { std::panic::resume_unwind(Box::new(())) });
         assert_eq!(panicked, None);
-        assert_eq!(guarded(bridge_catches_panic), Some(true));
+        assert_eq!(guarded(note_panic), Some(true));
         assert!(!in_cdcics());
-    }
-
-    #[test]
-    fn sysout_takes_c_stdio_and_leaves_descriptors_alone() {
-        let dir = std::env::temp_dir();
-        let (a, b) = (dir.join(format!("cobridge-a-{}.log", std::process::id())), dir.join(format!("cobridge-b-{}.log", std::process::id())));
-        let before = stdout_id();
-        set_sysout(&a).unwrap();
-        unsafe {
-            libc::fputs(c"to stdout\n".as_ptr(), C_STDOUT);
-            libc::fputs(c"to stderr\n".as_ptr(), C_STDERR);
-            fflush(std::ptr::null_mut());
-        }
-        assert_eq!(stdout_id(), before, "fd 1 untouched");
-        assert!(write_sysout("from a hook\n"));
-        assert_eq!(std::fs::read_to_string(&a).unwrap(), "to stdout\nto stderr\nfrom a hook\n");
-        assert_eq!(sysout_path().as_deref(), Some(a.as_path()));
-        set_sysout(&b).unwrap(); // switching files
-        unsafe {
-            libc::fputs(c"later\n".as_ptr(), C_STDOUT);
-            fflush(std::ptr::null_mut());
-        }
-        assert_eq!(std::fs::read_to_string(&b).unwrap(), "later\n");
-        assert_eq!(sysout_path().as_deref(), Some(b.as_path()));
-        for p in [a, b] {
-            let _ = std::fs::remove_file(p);
-        }
     }
 }

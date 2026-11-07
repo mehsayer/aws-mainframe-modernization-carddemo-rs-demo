@@ -3,7 +3,7 @@ use batch::{Dd, StepCtx};
 use std::path::PathBuf;
 
 fn seed() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC")
+    batch::repro::sample_seed_dir()
 }
 
 #[test]

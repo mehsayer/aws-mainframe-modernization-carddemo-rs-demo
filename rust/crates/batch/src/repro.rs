@@ -3,8 +3,21 @@
 //! TRANCATG, TRANTYPE, DUSRSECJ).
 
 use crate::seqfile::{read_all, Format, SeqOut};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use vsam::{Resp, Vsam};
+
+/// The shipped EBCDIC sample data in the repository (`cobol/app/data/EBCDIC`), for tests and tools run
+/// from the source tree.
+pub fn sample_seed_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC")
+}
+
+/// An in-memory store loaded with the shipped sample data ([`sample_seed_dir`]).
+pub fn sample_store() -> Result<Vsam, String> {
+    let v = Vsam::open_in_memory().map_err(|e| format!("in-memory store: {e:?}"))?;
+    reset(&v, &sample_seed_dir())?;
+    Ok(v)
+}
 
 /// REPRO a sequential file into a KSDS (records sorted by key as VSAM requires;
 /// duplicates rejected like REPRO does). Returns records loaded.
