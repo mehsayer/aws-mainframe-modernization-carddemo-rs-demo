@@ -48,7 +48,8 @@ def module_names():
 
 
 MOD_OUT = None  # set in build() (the online program list is needed first)
-COBC = ["cobc", "-std=ibm", "-fsign=EBCDIC", "-I", str(CPY_OUT)]
+# CICSPREP_TRACE=1: modules with GnuCOBOL's paragraph trace (difftest/coverage.py; never for the release)
+COBC = ["cobc", "-std=ibm", "-fsign=EBCDIC", "-I", str(CPY_OUT)] + (["-ftrace"] if os.environ.get("CICSPREP_TRACE") else [])
 
 # CICS response codes (DFHRESP)
 RESP = {"NORMAL": 0, "ERROR": 1, "RDATT": 2, "WRBRK": 3, "EOF": 4, "EODS": 5, "EOC": 6, "INBFMH": 7,

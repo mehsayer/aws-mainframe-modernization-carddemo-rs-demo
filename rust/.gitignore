@@ -5,3 +5,5 @@ out/
 difftest/build/
 out-online/
 out-online-failed/
+difftest/out-coverage/
+difftest/out-fuzz/

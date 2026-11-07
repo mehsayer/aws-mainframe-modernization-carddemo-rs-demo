@@ -65,6 +65,17 @@ pub fn log_screen(s: &Session) {
     f.write_all(out.as_bytes()).unwrap();
 }
 
+/// With `CARDDEMO_SCREEN_LOG`, a note line (`# ...`) in the test's screen log, e.g. the input that led to the
+/// next screen; online.py's comparison ignores such lines.
+pub fn log_note(text: &str) {
+    let Some(dir) = std::env::var_os("CARDDEMO_SCREEN_LOG") else { return };
+    use std::io::Write;
+    let name = std::thread::current().name().unwrap_or("main").replace("::", "-");
+    let path = std::path::Path::new(&dir).join(format!("{name}.log"));
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path).unwrap();
+    writeln!(f, "# {text}").unwrap();
+}
+
 pub struct Term<'a> {
     pub r: &'a Region,
     pub s: Session,

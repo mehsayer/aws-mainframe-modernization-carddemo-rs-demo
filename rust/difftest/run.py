@@ -25,6 +25,15 @@ INTCALC_PARM = "2022071800"
 REPORT = ("2022-01-01", "2022-07-06")
 # copybooks are compiled from a copy with tabs expanded (CUSTREC/CSLKPCDY contain tabs at width 4)
 COBC = ["cobc", "-std=ibm", "-fsign=EBCDIC", "-fstatic-call", "-I", str(BUILD / "cpy")]
+# --coverage DIR (difftest/coverage.py): the programs get GnuCOBOL's paragraph trace; each run writes DIR/batch-<n>-<prog>.trace
+COVERAGE = Path(sys.argv[sys.argv.index("--coverage") + 1]).resolve() if "--coverage" in sys.argv else None
+if COVERAGE:
+    COBC.append("-ftrace")
+RUNS = [0]
+# --dalytran FILE (difftest/fuzz.py): the daily transactions of POSTTRAN and DALYVRFY, both sides, instead of the
+# shipped sample (EBCDIC fixed records, the format of cobol/app/data/EBCDIC)
+DALYTRAN = Path(sys.argv[sys.argv.index("--dalytran") + 1]).resolve() if "--dalytran" in sys.argv else None
+DALY_ARGS = ["--dalytran", str(DALYTRAN)] if DALYTRAN else []
 
 # data set -> (record length, key offset, key length, [alternate keys (off, len)])
 DS = {
@@ -283,13 +292,26 @@ def build():
 
 def rust(home, *args):
     env = dict(os.environ, CARDDEMO_HOME=str(home), CARDDEMO_SEED=str(SEED), CARDDEMO_NOW=NOW_RUST)
-    return sh([str(BIN), *args], env=env).stdout.decode()
+    r = sh([str(BIN), *args], env=env, check=False)
+    out = r.stdout.decode()
+    # a job may end with an abend (for example on fuzzed input): that is a result to compare, not a harness failure
+    if r.returncode not in (0, 4) and not re.search(r"ABEND U\d{4}", out):
+        sys.stderr.write(out + r.stderr.decode(errors="replace"))
+        raise SystemExit(f"failed ({r.returncode}): {BIN} {' '.join(args)}")
+    return out
+
+
+def rust_rc(text):
+    """The job step's outcome from `carddemo job` output: 0 or 4, or the abend code (U0999)."""
+    m = re.search(r"ABEND (U\d{4})", text)
+    return m.group(1) if m else 4 if "RC=0004" in text else 0 if "RC=0000" in text else "?"
 
 def rust_sysout(text):
     """Program DISPLAY output from `carddemo job` (drop the job runner's own lines)."""
     keep = []
     for l in text.splitlines():
-        if re.match(r"^\S+\s+STEP\S*\s+\S+\s+RC=", l) or re.search(r"MAXCC=", l) or re.match(r"^STEP\S+ (IDCAMS|SORT|IEFBR14):", l):
+        if (re.match(r"^\S+\s+STEP\S*\s+\S+\s+(RC=|ABEND U)", l) or re.search(r"MAXCC=|JOB ENDED WITH ABEND", l)
+                or re.match(r"^STEP\S+ (IDCAMS|SORT|IEFBR14):", l)):
             continue
         keep.append(norm_ts(l.rstrip().encode("latin-1")).decode("latin-1"))
     return keep
@@ -314,9 +336,19 @@ def cob_unload(work, name, idx):
     return dst
 
 def cob_run(work, prog, dds, args=()):
-    r = subprocess.run([str(BUILD / prog), *args], env=cob_env(work, dds), capture_output=True, cwd=work)
+    env = cob_env(work, dds)
+    if COVERAGE:
+        RUNS[0] += 1
+        env.update(COB_SET_TRACE="Y", COB_TRACE_FILE=str(COVERAGE / f"batch-{RUNS[0]:02d}-{prog}.trace"))
+    r = subprocess.run([str(BUILD / prog), *args], env=env, capture_output=True, cwd=work)
     out = norm_ts(r.stdout).replace(b"\x00", b" ").decode("latin-1").splitlines()
-    return r.returncode, [ibm_display(l.rstrip()) for l in out], r.stderr.decode("latin-1")
+    rc = r.returncode
+    # the CEE3ABD stub's line: the abend code is compared as the step's outcome, like the Rust job's
+    abend = [l for l in out if l.startswith("CEE3ABD ABEND U")]
+    if abend:
+        rc = abend[-1].split()[-1]
+        out = [l for l in out if not l.startswith("CEE3ABD ABEND U")]
+    return rc, [ibm_display(l.rstrip()) for l in out], r.stderr.decode("latin-1")
 
 class Report:
     def __init__(self):
@@ -375,6 +407,8 @@ def main():
     if "--no-build" not in sys.argv:
         print("building COBOL programs ...")
         build()
+        if "--build-only" in sys.argv:
+            return
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir(parents=True)
     rh = OUT / "rust-home"
@@ -387,7 +421,8 @@ def main():
         return OUT / "snap" / tag
 
     def seq_from_seed(name, n, dst):
-        b = (SEED / name).read_bytes().translate(E2A)
+        src = DALYTRAN if DALYTRAN and name == "AWS.M2.CARDDEMO.DALYTRAN.PS" else SEED / name
+        b = src.read_bytes().translate(E2A)
         dst.write_bytes(b)
         return dst
 
@@ -401,7 +436,7 @@ def main():
     rc, out, err = cob_run(w, "CBACT01C", {"ACCTFILE": idx["ACCTDATA"], "OUTFILE": w / "PSCOMP.dat",
                                           "ARRYFILE": w / "ARRYPS.dat", "VBRCFILE": w / "VBPS.dat"})
     t = "READACCT / CBACT01C"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_records(t, "OUTFILE (with COMP-3)", ds / f"{hlq}.ACCTDATA.PSCOMP", w / "PSCOMP.dat", 107)
     def initialize_sign(r):
         # slots 4-5 are only set by INITIALIZE ARR-ARRAY-REC: GnuCOBOL stores unsigned zeros there,
@@ -422,21 +457,21 @@ def main():
         rs = rust(rh, "job", job)
         rc, out, err = cob_run(w, prog, {dd: idx[name]})
         t = f"{job} / {prog}"
-        rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+        rep.cmp_value(t, "return code", rust_rc(rs), rc)
         rep.cmp_lines(t, "SYSOUT", rust_sysout(rs), out)
-    rs = rust(rh, "job", "DALYVRFY")
+    rs = rust(rh, "job", "DALYVRFY", *DALY_ARGS)
     daly = seq_from_seed("AWS.M2.CARDDEMO.DALYTRAN.PS", 350, w / "DALYTRAN.dat")
     rc, out, err = cob_run(w, "CBTRN01C", {"DALYTRAN": daly, "CUSTFILE": idx["CUSTDATA"], "XREFFILE": idx["CARDXREF"],
                                           "CARDFILE": idx["CARDDATA"], "ACCTFILE": idx["ACCTDATA"], "TRANFILE": idx["TRANSACT"]})
     t = "DALYVRFY / CBTRN01C"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_lines(t, "SYSOUT", rust_sysout(rs), out)
 
     rust(rh, "job", "TRANBKP")
 
     # ---------------- POSTTRAN / CBTRN02C
     pre = snap("pre-posttran")
-    rs = rust(rh, "job", "POSTTRAN")
+    rs = rust(rh, "job", "POSTTRAN", *DALY_ARGS)
     post = snap("post-posttran")
     w = OUT / "cob-posttran"; w.mkdir()
     daly = seq_from_seed("AWS.M2.CARDDEMO.DALYTRAN.PS", 350, w / "DALYTRAN.dat")
@@ -444,7 +479,7 @@ def main():
     rc, out, err = cob_run(w, "CBTRN02C", {"DALYTRAN": daly, "TRANFILE": idx["TRANSACT"], "XREFFILE": idx["CARDXREF"],
                                           "DALYREJS": w / "DALYREJS.dat", "ACCTFILE": idx["ACCTDATA"], "TCATBALF": idx["TCATBALF"]})
     t = "POSTTRAN / CBTRN02C"
-    rep.cmp_value(t, "return code", 4 if "RC=0004" in rs else (0 if "RC=0000" in rs else "?"), rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     for n in ("TRANSACT", "ACCTDATA", "TCATBALF"):
         rep.cmp_records(t, n, post / f"{n}.dat", cob_unload(w, n, idx[n]), DS[n][0])
     rep.cmp_records(t, "DALYREJS", ds / f"{hlq}.DALYREJS.G0001V00", w / "DALYREJS.dat", 430)
@@ -459,7 +494,7 @@ def main():
     rc, out, err = cob_run(w, "CBACT04C", {"TCATBALF": idx["TCATBALF"], "XREFFILE": idx["CARDXREF"], "ACCTFILE": idx["ACCTDATA"],
                                           "DISCGRP": idx["DISCGRP"], "TRANSACT": w / "SYSTRAN.dat"}, [INTCALC_PARM])
     t = "INTCALC / CBACT04C"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_records(t, "ACCTDATA", post / "ACCTDATA.dat", cob_unload(w, "ACCTDATA", idx["ACCTDATA"]), 300)
     rep.cmp_records(t, "SYSTRAN (interest transactions)", ds / f"{hlq}.SYSTRAN.G0001V00", w / "SYSTRAN.dat", 350)
     rep.cmp_lines(t, "SYSOUT", rust_sysout(rs), out)
@@ -477,7 +512,7 @@ def main():
                                           "TRANTYPE": idx["TRANTYPE"], "TRANCATG": idx["TRANCATG"], "DATEPARM": parm,
                                           "TRANREPT": w / "TRANREPT.dat"})
     t = "TRANREPT / CBTRN03C"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_lines(t, "TRANREPT report", lines_of(ds / f"{hlq}.TRANREPT.G0001V00"), lines_of(w / "TRANREPT.dat", 133))
     rep.cmp_lines(t, "SYSOUT", rust_sysout(rs), out)
 
@@ -489,7 +524,7 @@ def main():
     rc, out, err = cob_run(w, "CBSTM03A", {"TRNXFILE": idx["TRXFL"], "XREFFILE": idx["CARDXREF"], "ACCTFILE": idx["ACCTDATA"],
                                           "CUSTFILE": idx["CUSTDATA"], "STMTFILE": w / "STATEMNT.PS", "HTMLFILE": w / "STATEMNT.HTML"})
     t = "CREASTMT / CBSTM03A+B"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_lines(t, "STATEMNT.PS (text)", lines_of(ds / f"{hlq}.STATEMNT.PS"), lines_of(w / "STATEMNT.PS", 80))
     rep.cmp_lines(t, "STATEMNT.HTML", lines_of(ds / f"{hlq}.STATEMNT.HTML"), lines_of(w / "STATEMNT.HTML", 100))
 
@@ -500,7 +535,7 @@ def main():
     rc, out, err = cob_run(w, "CBEXPORT", {"CUSTFILE": idx["CUSTDATA"], "ACCTFILE": idx["ACCTDATA"], "XREFFILE": idx["CARDXREF"],
                                           "TRANSACT": idx["TRANSACT"], "CARDFILE": idx["CARDDATA"], "EXPFILE": w / "EXPORT.idx"})
     t = "CBEXPORT (patched FD, KD-12)"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     rep.cmp_records(t, "EXPFILE", ds / f"{hlq}.EXPORT.DATA", cob_unload(w, "EXPORT", w / "EXPORT.idx"), 500)
     rep.cmp_lines(t, "SYSOUT", rust_sysout(rs), out)
     # inject one record with an unknown type (exercises 2700-PROCESS-UNKNOWN-RECORD / ERROUT on both sides)
@@ -517,7 +552,7 @@ def main():
             "TRNXOUT": ("TRANSACT.IMPORT", 350), "CARDOUT": ("CARDDATA.IMPORT", 150), "ERROUT": ("IMPORT.ERRORS", 132)}
     rc, out, err = cob_run(w, "CBIMPORT", {"EXPFILE": w / "EXPORT.idx", **{dd: w / f"{n}" for dd, (n, _) in outs.items()}})
     t = "CBIMPORT (patched FD, KD-12)"
-    rep.cmp_value(t, "return code", 0 if "RC=0000" in rs else "?", rc)
+    rep.cmp_value(t, "return code", rust_rc(rs), rc)
     for dd, (n, l) in outs.items():
         # ERR-TIMESTAMP = FUNCTION CURRENT-DATE: hundredths and UTC offset are host-dependent
         rep.cmp_records(t, dd, ds / f"{hlq}.{n}", w / n, l, mask=[(14, 21)] if dd == "ERROUT" else ())

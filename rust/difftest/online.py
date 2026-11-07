@@ -23,10 +23,18 @@ HERE = Path(__file__).resolve().parent
 RS = HERE.parent
 OUT = HERE / "out-online"
 # test targets that drive the terminal through tests/common::region() (the others build their own regions)
-TARGETS = ["manual_suite", "signon", "users", "cards_accounts", "transactions", "review_fixes"]
+TARGETS = ["manual_suite", "signon", "users", "cards_accounts", "transactions", "review_fixes", "coverage_sessions"]
+# --only TARGET: compare one test file (difftest/fuzz.py uses it for fuzz_sessions, which is not in the default list)
+if "--only" in sys.argv:
+    TARGETS = [sys.argv[sys.argv.index("--only") + 1]]
 
 
 TESTS = {}  # target -> region -> test name -> {"result": "ok"|"FAILED", "note": first panic line}
+# --coverage DIR (difftest/coverage.py): the COBOL modules are built with the paragraph trace into DIR/modules
+# (not the normal module directory, which the release packages), and each COBOL test run writes DIR/online-<target>.trace
+COVERAGE = Path(sys.argv[sys.argv.index("--coverage") + 1]).resolve() if "--coverage" in sys.argv else None
+if COVERAGE:
+    os.environ.update(CARDDEMO_COBOL_MODULES=str(COVERAGE / "modules"), CICSPREP_TRACE="1")
 ENDED_EARLY = []  # report sections for test runs that ended without libtest's summary
 
 
@@ -39,6 +47,8 @@ def run(target, region, logdir):
                CARDDEMO_COBOL_SYSOUT=str(sysout))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
+        if COVERAGE:
+            env.update(COB_SET_TRACE="Y", COB_TRACE_FILE=str(COVERAGE / f"online-{target}.trace"))
     r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
                        cwd=RS, env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
@@ -85,6 +95,10 @@ ACCEPTED = [
      "Menu option typed as letters: MOVE of the alphanumeric WS-OPTION-X to the numeric WS-OPTION and back to the "
      "screen. GnuCOBOL converts it to 00; IBM COBOL copies the bytes and repairs only the last zone; the Rust port "
      "redisplays the text."),
+    (r'^  OPTION "  " ', r'^  OPTION "00" ',
+     "Menu option not typed at all, Enter: the field arrives as LOW-VALUES, and the same MOVE to the numeric "
+     "WS-OPTION and back applies to X'00' bytes. GnuCOBOL converts them to 00; the Rust port redisplays the bytes, "
+     "as it does for letters (accepted difference 2); typed spaces and zeros give 00 on both."),
 ]
 
 
