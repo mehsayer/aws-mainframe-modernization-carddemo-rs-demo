@@ -208,3 +208,19 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
   `carddemo.exe reset`/`batch` run, `online --cobol` refuses with "Linux only"; the full nightly batch from
   the same sample data gives the same job log, the same 8 output files byte for byte and identical contents
   in all 11 VSAM datasets as the Linux build.
+
+### Code review (2026-11-07, seventh `/code-review xhigh`): all 7 findings fixed
+- online.py: a test run counts as built when cargo started the test binary (cargo's "error: test failed"
+  no longer makes a crash look like a build error); only "libcob:" lines this run added to the sysout file
+  are shown. The classification is a function with unit tests (rust/difftest/test_online.py).
+- The exit handler is installed before libcob starts (`term::install()`): a failing `cob_init` (broken
+  COB_RUNTIME_CONFIG) is reported on the terminal instead of exiting silently.
+- Fault signals (SEGV, BUS, FPE, ILL) raised by the kernel are not re-raised: the handler restores the
+  previous action and returns, so the fault recurs with its real details and Rust's stack-overflow message
+  appears. Signals that were sent are raised again.
+- A panic the hook misjudged (`note_panic`) no longer breaks the session: `term::ensure_on` puts the UI back
+  before the next screen if it was taken off while the program goes on.
+- `cobridge::init()` returns a Result (no panic inside a Once); `run()` turns it into an APCT abend.
+- New tests/terminal.rs (carddemo): the real binary in a pseudo-terminal - quit, SIGTERM/SIGHUP, failed
+  setup, stack overflow (debug trigger), COBOL init failure, libcob runtime error under the UI. Each of the
+  two new cases fails with the reviewed bug put back. Windows tests under Wine pass as well.

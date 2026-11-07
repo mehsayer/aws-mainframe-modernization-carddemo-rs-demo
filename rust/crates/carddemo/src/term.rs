@@ -18,11 +18,9 @@ static ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(unix)]
 static SAVED_STDERR: AtomicI32 = AtomicI32::new(-1);
 
-/// Put the UI on the terminal. The returned guard takes it off again when dropped, also when a later step
-/// of the setup fails. With `--cobol`, call `cobridge::start()` first (libcob installs its signal handlers
-/// there; ours must come after them, to run first and pass the signal on).
-pub fn start() -> Result<(UiOn, ratatui::DefaultTerminal)> {
-    use crossterm::{execute, terminal};
+/// Install the panic hook and the exit handler (once). Call it first thing: with `--cobol`, before
+/// `cobridge::start()`, which may already end the process (libcob's initialisation) and must be reported.
+pub fn install() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
         std::panic::set_hook(panic_hook(std::panic::take_hook(), end, cobridge::write_sysout));
@@ -31,15 +29,40 @@ pub fn start() -> Result<(UiOn, ratatui::DefaultTerminal)> {
             libc::atexit(at_exit);
         }
     });
+}
+
+/// Put the UI on the terminal. The returned guard takes it off again when dropped, also when a later step
+/// of the setup fails. With `--cobol`, call `cobridge::start()` first (libcob installs its signal handlers
+/// there; ours must come after them, to run first and pass the signal on).
+pub fn start() -> Result<(UiOn, ratatui::DefaultTerminal)> {
+    install();
     #[cfg(unix)]
     signals::install(); // saves the terminal settings: before raw mode
+    let on = UiOn;
+    put_on()?;
+    Ok((on, Terminal::new(CrosstermBackend::new(std::io::stdout()))?))
+}
+
+/// Raw mode, descriptor 2 on the sysout file (`--cobol`), the alternate screen.
+fn put_on() -> Result<()> {
+    use crossterm::{execute, terminal};
     terminal::enable_raw_mode()?;
     ACTIVE.store(true, Ordering::SeqCst);
-    let on = UiOn;
     #[cfg(unix)]
     stderr_to_sysout()?;
     execute!(std::io::stdout(), terminal::EnterAlternateScreen)?;
-    Ok((on, Terminal::new(CrosstermBackend::new(std::io::stdout()))?))
+    Ok(())
+}
+
+/// Put the UI back if it was taken off while the program goes on. That happens only if the panic hook
+/// misjudged a panic the COBOL bridge then caught (see `cobridge::note_panic`): the task ended with ASRA,
+/// and the session continues on a restored screen instead of a terminal in cooked mode.
+pub fn ensure_on(term: &mut ratatui::DefaultTerminal) -> Result<()> {
+    if !ACTIVE.load(Ordering::SeqCst) {
+        put_on()?;
+        term.clear()?;
+    }
+    Ok(())
 }
 
 /// The UI is on the terminal; dropping this takes it off ([`end`]).
@@ -174,8 +197,8 @@ mod signals {
                 continue; // ignored (e.g. SIGHUP under nohup): the process goes on, the UI too
             }
             let mut act: libc::sigaction = unsafe { std::mem::zeroed() };
-            act.sa_sigaction = on_signal as extern "C" fn(c_int) as usize;
-            act.sa_flags = libc::SA_ONSTACK; // a stack overflow arrives as SIGSEGV
+            act.sa_sigaction = on_signal as extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void) as usize;
+            act.sa_flags = libc::SA_SIGINFO | libc::SA_ONSTACK; // a stack overflow arrives as SIGSEGV
             unsafe {
                 libc::sigemptyset(&mut act.sa_mask);
                 libc::sigaction(sig, &act, std::ptr::null_mut());
@@ -183,7 +206,10 @@ mod signals {
         }
     }
 
-    extern "C" fn on_signal(sig: c_int) {
+    /// Faults: the instruction that caused them runs again once the handler returns.
+    const FAULTS: [c_int; 4] = [libc::SIGSEGV, libc::SIGBUS, libc::SIGFPE, libc::SIGILL];
+
+    extern "C" fn on_signal(sig: c_int, info: *mut libc::siginfo_t, _ctx: *mut libc::c_void) {
         if ACTIVE.swap(false, Ordering::SeqCst) {
             stderr_back(); // so the next handler's message (libcob's) reaches the terminal
             if let Some(t) = TERMIOS.get() {
@@ -192,11 +218,14 @@ mod signals {
             let leave = b"\x1b[?25h\x1b[?1049l"; // show the cursor, leave the alternate screen
             unsafe { libc::write(1, leave.as_ptr().cast(), leave.len()) };
         }
-        // pass it on: the earlier action handles the signal once this handler returns
+        // pass it on to the earlier action. A fault raised by the kernel (si_code > 0) recurs when this
+        // handler returns, and reaches that action with its real details (Rust's stack-overflow handler
+        // looks at the fault address); a signal that was sent (kill, raise, abort) is sent again.
         if let (Some(prev), Some(i)) = (PREV.get(), SIGNALS.iter().position(|&s| s == sig)) {
-            unsafe {
-                libc::sigaction(sig, &prev[i], std::ptr::null_mut());
-                libc::raise(sig);
+            unsafe { libc::sigaction(sig, &prev[i], std::ptr::null_mut()) };
+            let kernel_fault = FAULTS.contains(&sig) && !info.is_null() && unsafe { (*info).si_code } > 0;
+            if !kernel_fault {
+                unsafe { libc::raise(sig) };
             }
         }
     }

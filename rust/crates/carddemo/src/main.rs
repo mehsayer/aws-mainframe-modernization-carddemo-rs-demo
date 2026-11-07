@@ -282,6 +282,8 @@ fn unprotected(s: &cics::Screen) -> Vec<usize> {
 }
 
 fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result<()> {
+    // panic hook and exit handler first: with --cobol, libcob's initialisation below may end the process
+    term::install();
     let v = open_store(home)?;
     if v.count("USRSEC").unwrap_or(0) == 0 {
         if let Some(seed) = &seed {
@@ -295,11 +297,16 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     // the UI goes on before the first transaction, so that already runs under the UI's panic hook and
     // (--cobol) with descriptor 2 on the sysout file; the guard takes it off on every way out
     let (_ui_on, mut term) = term::start()?;
+    #[cfg(debug_assertions)]
+    if std::env::var_os("CARDDEMO_TEST_STACK_OVERFLOW").is_some() {
+        test_stack_overflow(0); // tests/terminal.rs: a crash while the UI is on
+    }
     let mut sess = Session::default();
     region.run(&mut sess, Some(tran), Aid::Enter);
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
     (|| -> Result<()> {
         loop {
+            term::ensure_on(&mut term)?;
             term.draw(|f| draw(f, &sess, &ui))?;
             let Event::Key(k) = event::read()? else { continue };
             if k.kind != event::KeyEventKind::Press {
@@ -329,6 +336,14 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
         }
         Ok(())
     })()
+}
+
+/// Recurses until the stack overflows (debug builds, `CARDDEMO_TEST_STACK_OVERFLOW`; see tests/terminal.rs).
+#[cfg(debug_assertions)]
+#[allow(unconditional_recursion)]
+fn test_stack_overflow(n: u64) -> u64 {
+    let frame = std::hint::black_box([n; 512]);
+    test_stack_overflow(n + 1) + frame[0]
 }
 
 fn aid_of(k: &KeyEvent) -> Option<Aid> {

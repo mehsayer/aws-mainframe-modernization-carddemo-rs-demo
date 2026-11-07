@@ -3,7 +3,6 @@ mod common;
 use cics::Aid;
 use cobol::copybooks::*;
 use common::*;
-use std::path::PathBuf;
 
 fn fix_account(t: &mut Term) {
     t.typ("ACSTFCO", "750").typ("ACSSTTE", "NY").typ("ACSZIPC", "10001")
@@ -114,7 +113,7 @@ fn busy_store_is_reported_and_nothing_is_written() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("datasets")).unwrap();
     let db = dir.join("carddemo.db");
-    let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
+    let seed = batch::repro::sample_seed_dir();
     let holder = vsam::Vsam::open(&db).unwrap();
     batch::repro::reset(&holder, &seed).unwrap();
     let v = vsam::Vsam::open(&db).unwrap();

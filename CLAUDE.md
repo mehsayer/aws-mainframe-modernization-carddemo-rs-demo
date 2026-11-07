@@ -22,6 +22,7 @@ cd rust && CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc CARGO_TARGET_X86_64_P
 #   same variables + CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER=wine: cargo test --release --target x86_64-pc-windows-gnu --workspace
 python3 rust/difftest/run.py          # compile cobol/ with GnuCOBOL, compare all batch outputs with Rust
 python3 rust/cobridge/cicsprep.py     # translate + compile the original online programs for the CICS bridge
+python3 -m unittest rust/difftest/test_online.py               # online.py's report helpers
 python3 rust/difftest/online.py       # run the online tests on Rust and on the original COBOL, compare screens
                                       #   (--rust-only without GnuCOBOL; results in difftest/out-online/)
 CARDDEMO_REGION=cobol cargo test --release -p online --tests -- --test-threads=1   # online tests on COBOL
@@ -70,7 +71,9 @@ When asked to review code (a diff, a branch, a PR, "review this"), **review only
   `CARDDEMO_NOW` freezes the Rust clock.
 - The bridge installs no panic hook: a panic inside an EXEC CICS call is caught there (ASRA). The TUI
   (`crates/carddemo/src/term.rs`) owns the one hook (not ratatui's `init()`, which adds its own), the exit
-  handler and the fatal-signal handlers, and takes the UI off exactly once on every way out. Its hook
+  handler and the fatal-signal handlers, and takes the UI off exactly once on every way out
+  (`crates/carddemo/tests/terminal.rs` checks this in a real pseudo-terminal: quit, kill, failed setup,
+  stack overflow, libcob ending the process). `term::install()` comes first, before libcob starts. Its hook
   calls `cobridge::note_panic()` once per panic; the exit handler reports a libcob exit when
   `cobridge::in_cobol()`. `cobridge::start()` (libcob's own signal handlers) comes before the UI's.
 - Platforms: Linux and Windows (NFR-09; macOS and musl are not targets). The COBOL bridge runs on Linux

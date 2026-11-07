@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Once, OnceLock};
+use std::sync::OnceLock;
 use vsam::{Browse, Resp};
 
 #[cfg(unix)]
@@ -172,30 +172,32 @@ pub fn check() -> Result<(), String> {
     COB.get_or_init(load_cob).as_ref().map(|_| ()).map_err(Clone::clone)
 }
 
-static INIT: Once = Once::new();
+/// The outcome of the one initialisation of the COBOL runtime (see [`init`]).
+static INIT: OnceLock<Result<(), String>> = OnceLock::new();
 
 /// Check and initialise the COBOL runtime now (otherwise the first program call does it). libcob installs
 /// its signal handlers here: a UI that adds its own (to restore the terminal) calls this first, so that its
-/// handlers run first and then pass the signal on to libcob's.
+/// handlers run first and then pass the signal on to libcob's. libcob may end the process here (a broken
+/// runtime configuration): register an exit handler before calling this ([`in_cobol`] is true then).
 pub fn start() -> Result<(), String> {
-    check()?;
-    init();
-    Ok(())
+    init()
 }
 
-fn init() {
-    INIT.call_once(|| {
+/// Initialise the COBOL runtime once per process: [`check`], then `cob_init`. Its outcome is kept, so a
+/// failure is reported the same way to every later caller.
+fn init() -> Result<(), String> {
+    INIT.get_or_init(|| {
         std::env::set_var("COB_LIBRARY_PATH", modules_dir());
         // A fixed test clock (CARDDEMO_NOW) is passed on to FUNCTION CURRENT-DATE. GnuCOBOL treats
         // COB_CURRENT_DATE as a frozen clock, so it is only set when the Rust side is frozen too.
         if let Some(now) = cobol::clock::fixed_now() {
             std::env::set_var("COB_CURRENT_DATE", now.format("%Y/%m/%d %H:%M:%S").to_string());
         }
-        if let Err(e) = check() {
-            panic!("{e}");
-        }
+        check()?;
         cobol(|| unsafe { (cob().init)(0, std::ptr::null_mut()) });
-    });
+        Ok(())
+    })
+    .clone()
 }
 
 /// A region whose programs are the original COBOL programs (same transactions, maps, data store).
@@ -247,7 +249,11 @@ fn pack7(v: u32) -> [u8; 4] {
 
 /// Run one original COBOL program for the current task (Region calls this like a Rust program).
 pub fn run(t: &mut Task) -> Cr {
-    init();
+    if let Err(e) = init() {
+        // the program cannot be loaded, as CICS reports it
+        t.log.push(format!("cobridge: {e}"));
+        return Err(Transfer::Abend("APCT".into()));
+    }
     let name = CString::new(t.program.trim()).expect("program name");
     if cobol(|| unsafe { (cob().resolve)(name.as_ptr()) }).is_null() {
         return Err(Transfer::Abend("APCT".into()));
