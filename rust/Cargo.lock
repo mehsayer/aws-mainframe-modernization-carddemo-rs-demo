@@ -99,7 +99,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "batch"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "cobol",
@@ -151,7 +151,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "carddemo"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "batch",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "cics"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "cobol",
@@ -266,7 +266,7 @@ checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
 name = "cobol"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "rust_decimal",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "cobridge"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "batch",
  "chrono",
@@ -686,7 +686,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "online"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "batch",
  "chrono",
@@ -1183,7 +1183,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vsam"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "rusqlite",
  "thiserror",

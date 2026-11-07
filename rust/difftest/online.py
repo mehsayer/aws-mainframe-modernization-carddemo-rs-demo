@@ -39,7 +39,6 @@ def run(target, region, logdir):
                CARDDEMO_COBOL_SYSOUT=str(sysout))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
-    sysout_before = sysout.stat().st_size if sysout.exists() else 0
     r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
                        cwd=RS, env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
@@ -51,27 +50,27 @@ def run(target, region, logdir):
     TESTS.setdefault(target, {})[region] = tests
     m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not m:
-        with open(sysout, "rb") if sysout.exists() else open(os.devnull, "rb") as f:
-            f.seek(sysout_before)
-            new_sysout = f.read().decode("latin-1")
-        section = ended_early(f"{target} / {region}", out, r.returncode, new_sysout, sysout.relative_to(OUT))
+        # OUT is fresh for every online.py run, so the whole sysout file is this run's
+        run_sysout = sysout.read_text(encoding="latin-1") if sysout.exists() else ""
+        section = ended_early(f"{target} / {region}", out, r.returncode, run_sysout, sysout.relative_to(OUT))
         sys.stderr.write(out[-3000:] + "\n" + section + "\n")
         ENDED_EARLY.append(section)
     return (int(m.group(1)), int(m.group(2))) if m else (0, -1)
 
 
-def ended_early(name, out, returncode, new_sysout, sysout_name):
+def ended_early(name, out, returncode, run_sysout, sysout_name):
     """Report section for a test run without libtest's summary. Built if cargo started the test binary
     ("Running tests/..."): then the process ended early, and if libcob ended it (runtime error), its message
-    is a "libcob:" line that this run added to the COBOL sysout file, not in the test output. Otherwise the
+    is a "libcob:" line in this run's COBOL sysout file, not in the test output. Otherwise the
     tests did not build, and the compiler's errors are shown."""
     lines = out.splitlines()
     if re.search(r"^\s*Running tests/", out, re.M):
-        libcob = [l for l in new_sysout.splitlines() if l.startswith("libcob:")][-5:]
+        libcob = [l for l in run_sysout.splitlines() if l.startswith("libcob:")][-5:]
         body = lines[-10:] + ([f"--- libcob's messages in {sysout_name}:"] + libcob if libcob else [])
         what = "the test run ended early"
     else:
-        body = [l for l in lines if l.startswith(("error", "  -->"))][:20]
+        # rustc indents "-->" by the width of the line number
+        body = [l for l in lines if l.startswith("error") or l.lstrip().startswith("-->")][:20]
         what = "the tests did not build"
     return "\n".join([f"### {name}: {what} (exit code {returncode})", "```", *body, "```"])
 

@@ -37,6 +37,17 @@ let the computer check that they produced exactly the same results.
 | Report / statement | Output files a person reads: a list of transactions, a customer's monthly statement |
 | Compile | Turn source code into a program the computer can run |
 
+## Demo 0: the download, no installation (for anyone, any time)
+
+The project's GitHub page has ready-made downloads under **Releases**
+(<https://github.com/mehsayer/aws-mainframe-modernization-carddemo-rs-demo/releases>): the Rust translation as
+one program with the sample data, for **Windows** (a zip: unpack it, double-click `carddemo.exe`) and
+**Linux** (a tar.gz: unpack it, run `./carddemo`). A menu offers the online screens, the nightly batch, the
+transaction report and a viewer for the output files; on Linux with the GnuCOBOL runtime also the original
+COBOL screens. Step by step: `docs/demo-quickstart.pdf` (also inside every download). No GnuCOBOL, Rust or
+Python is needed for it. The demos below show more: the original COBOL programs and the automatic
+comparison, from the project folder.
+
 ## Before the audience arrives (presenter, once)
 
 You need three free tools installed: **GnuCOBOL** (runs COBOL outside a mainframe), **Rust** and

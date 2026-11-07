@@ -13,9 +13,5 @@ online.workspace = true
 chrono.workspace = true
 libc.workspace = true
 
-[features]
-# `as_cdcics_call`, for tests of panic hooks (carddemo enables it for its tests only)
-test-hooks = []
-
 [dev-dependencies]
 batch.workspace = true

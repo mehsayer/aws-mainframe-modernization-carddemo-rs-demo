@@ -28,7 +28,8 @@ python3 rust/difftest/online.py       # run the online tests on Rust and on the 
 CARDDEMO_REGION=cobol cargo test --release -p online --tests -- --test-threads=1   # online tests on COBOL
 python3 docs/tests/execute.py         # execute the manual test suite (42 cases) -> docs/tests/results.json
 python3 demo/demo.py all              # demo: COBOL run, Rust run, compare
-sh docs/build-all.sh                  # rebuild requirements / test suite / presentation PDFs
+sh docs/build-all.sh                  # rebuild requirements / test suite / presentation / demo quick-start PDFs
+sh rust/tools/package-release.sh      # release downloads (Windows zip, Linux tar.gz) -> rust/target/packages/
 sh rust/tools/regen-records.sh        # regenerate crates/cobol/src/copybooks.rs from cobol/app/cpy
 ```
 

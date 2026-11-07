@@ -7,6 +7,9 @@ use std::sync::Mutex;
 static COB: Mutex<()> = Mutex::new(());
 
 fn region() -> Region {
+    if let Err(e) = cobridge::check() {
+        panic!("{e}");
+    }
     std::env::set_var("CARDDEMO_NOW", "2022-07-18T10:11:12.34");
     cobridge::region(batch::repro::sample_store().unwrap())
 }

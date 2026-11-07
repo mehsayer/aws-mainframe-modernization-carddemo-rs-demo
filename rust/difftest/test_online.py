@@ -13,10 +13,15 @@ test transaction_list_view_add ... error: test failed, to rerun pass `-p online 
 Caused by:
   process didn't exit successfully: `target/release/deps/transactions-5fbd --test-threads=1` (exit status: 1)"""
 
+# rustc's real layout: the "-->" arrow is indented by the width of the line number (1, 2, 3 digits)
 BUILD = """   Compiling online v0.1.0 (rust/crates/online)
 error[E0425]: cannot find function `nosuch` in this scope
-  --> crates/online/tests/signon.rs:5:5
-error: could not compile `online` (test "signon") due to 1 previous error"""
+ --> crates/online/tests/signon.rs:5:5
+error[E0425]: cannot find value `x` in this scope
+  --> crates/online/tests/users.rs:42:9
+error[E0308]: mismatched types
+   --> crates/online/tests/manual_suite.rs:751:13
+error: could not compile `online` (test "signon") due to 3 previous errors"""
 
 
 class EndedEarly(unittest.TestCase):
@@ -39,7 +44,8 @@ class EndedEarly(unittest.TestCase):
         s = ended_early("signon / rust", BUILD, 101, "", "signon/rust-sysout.log")
         self.assertIn("the tests did not build", s)
         self.assertIn("error[E0425]: cannot find function `nosuch`", s)
-        self.assertIn("  --> crates/online/tests/signon.rs:5:5", s)
+        for loc in ("signon.rs:5:5", "users.rs:42:9", "manual_suite.rs:751:13"):
+            self.assertIn(loc, s)
 
 
 if __name__ == "__main__":

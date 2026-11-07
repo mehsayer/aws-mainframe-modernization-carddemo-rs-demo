@@ -8,6 +8,10 @@ pub fn region() -> Region {
     std::env::set_var("CARDDEMO_NOW", "2022-07-18T10:11:12.34");
     let v = batch::repro::sample_store().unwrap();
     if cobol_region() {
+        // a missing libcob or unbuilt modules: say so, instead of an APCT abend on every screen
+        if let Err(e) = cobridge::check() {
+            panic!("CARDDEMO_REGION=cobol: {e}");
+        }
         cobridge::set_sysout(&cobol_sysout()).expect("cobol sysout file");
         cobridge::region(v)
     } else {

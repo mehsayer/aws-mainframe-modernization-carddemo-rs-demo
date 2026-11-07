@@ -122,7 +122,7 @@ pub fn in_cobol() -> bool {
 }
 
 /// Run `f` (a libcob call) with [`in_cobol`] true.
-fn cobol<R>(f: impl FnOnce() -> R) -> R {
+fn in_cobol_call<R>(f: impl FnOnce() -> R) -> R {
     IN_COBOL.store(true, Ordering::SeqCst);
     let r = f();
     IN_COBOL.store(false, Ordering::SeqCst);
@@ -172,20 +172,15 @@ pub fn check() -> Result<(), String> {
     COB.get_or_init(load_cob).as_ref().map(|_| ()).map_err(Clone::clone)
 }
 
-/// The outcome of the one initialisation of the COBOL runtime (see [`init`]).
+/// The outcome of the one initialisation of the COBOL runtime (see [`start`]).
 static INIT: OnceLock<Result<(), String>> = OnceLock::new();
 
-/// Check and initialise the COBOL runtime now (otherwise the first program call does it). libcob installs
-/// its signal handlers here: a UI that adds its own (to restore the terminal) calls this first, so that its
-/// handlers run first and then pass the signal on to libcob's. libcob may end the process here (a broken
-/// runtime configuration): register an exit handler before calling this ([`in_cobol`] is true then).
+/// Initialise the COBOL runtime, once per process: [`check`], then `cob_init`. The first program call does
+/// it if nobody did before; its outcome is kept, so a failure is reported the same way to every caller.
+/// libcob installs its signal handlers here: a UI that adds its own (to restore the terminal) calls this
+/// first, so that its handlers run first and then pass the signal on to libcob's. libcob may end the
+/// process here (a broken runtime configuration): register an exit handler before ([`in_cobol`] is true).
 pub fn start() -> Result<(), String> {
-    init()
-}
-
-/// Initialise the COBOL runtime once per process: [`check`], then `cob_init`. Its outcome is kept, so a
-/// failure is reported the same way to every later caller.
-fn init() -> Result<(), String> {
     INIT.get_or_init(|| {
         std::env::set_var("COB_LIBRARY_PATH", modules_dir());
         // A fixed test clock (CARDDEMO_NOW) is passed on to FUNCTION CURRENT-DATE. GnuCOBOL treats
@@ -194,7 +189,9 @@ fn init() -> Result<(), String> {
             std::env::set_var("COB_CURRENT_DATE", now.format("%Y/%m/%d %H:%M:%S").to_string());
         }
         check()?;
-        cobol(|| unsafe { (cob().init)(0, std::ptr::null_mut()) });
+        #[cfg(debug_assertions)]
+        test_seam::from_env();
+        in_cobol_call(|| unsafe { (cob().init)(0, std::ptr::null_mut()) });
         Ok(())
     })
     .clone()
@@ -249,13 +246,13 @@ fn pack7(v: u32) -> [u8; 4] {
 
 /// Run one original COBOL program for the current task (Region calls this like a Rust program).
 pub fn run(t: &mut Task) -> Cr {
-    if let Err(e) = init() {
+    if let Err(e) = start() {
         // the program cannot be loaded, as CICS reports it
         t.log.push(format!("cobridge: {e}"));
         return Err(Transfer::Abend("APCT".into()));
     }
     let name = CString::new(t.program.trim()).expect("program name");
-    if cobol(|| unsafe { (cob().resolve)(name.as_ptr()) }).is_null() {
+    if in_cobol_call(|| unsafe { (cob().resolve)(name.as_ptr()) }).is_null() {
         return Err(Transfer::Abend("APCT".into()));
     }
     let now = cobol::clock::now();
@@ -284,10 +281,10 @@ pub fn run(t: &mut Task) -> Cr {
     };
     let prev = CTX.with(|c| c.replace(&mut ctx));
     let mut args = [eib.as_mut_ptr() as *mut c_void, ca.as_mut_ptr() as *mut c_void];
-    cobol(|| unsafe { (cob().call)(name.as_ptr(), 2, args.as_mut_ptr()) });
+    in_cobol_call(|| unsafe { (cob().call)(name.as_ptr(), 2, args.as_mut_ptr()) });
     // CICS gives every task a fresh copy of WORKING-STORAGE; a CALLed GnuCOBOL program keeps its state
     // (and any PERFORM return addresses left by a HANDLE CONDITION GO TO) until it is cancelled
-    cobol(|| unsafe { (cob().cancel)(name.as_ptr()) });
+    in_cobol_call(|| unsafe { (cob().cancel)(name.as_ptr()) });
     sysout::flush();
     CTX.with(|c| c.set(prev));
     match ctx.transfer.take() {
@@ -469,21 +466,48 @@ fn guarded<R>(call: impl FnOnce() -> R + std::panic::UnwindSafe) -> Option<R> {
     r
 }
 
+/// Test seams, in debug builds only (release builds have none): a bridge panic on demand, and an EXEC CICS
+/// call without GnuCOBOL. Used by carddemo's tests.
+#[cfg(debug_assertions)]
+mod test_seam {
+    use std::sync::atomic::{AtomicU8, Ordering};
+
+    /// The next EXEC CICS command panics: 1 = an ordinary panic, 2 = one that cannot unwind.
+    pub static NEXT: AtomicU8 = AtomicU8::new(0);
+
+    /// `CARDDEMO_TEST_PANIC=unwind|nounwind`: the first command of the process panics that way.
+    pub fn from_env() {
+        match std::env::var("CARDDEMO_TEST_PANIC").as_deref() {
+            Ok("unwind") => NEXT.store(1, Ordering::SeqCst),
+            Ok("nounwind") => NEXT.store(2, Ordering::SeqCst),
+            _ => {}
+        }
+    }
+
+    pub fn fire() {
+        match NEXT.swap(0, Ordering::SeqCst) {
+            1 => panic!("test seam: EXEC CICS command panics"),
+            // std's debug-build precondition check: a panic that cannot unwind, the process aborts
+            2 => _ = unsafe { std::slice::from_raw_parts::<u8>(std::hint::black_box(std::ptr::null()), 1) },
+            _ => {}
+        }
+    }
+}
+
 /// Run `f` the way the bridge runs an EXEC CICS command: [`in_cdcics`] is true meanwhile and a panic is
-/// caught (None). For tests of panic hooks without GnuCOBOL.
-#[cfg(feature = "test-hooks")]
+/// caught (None). A test seam (debug builds): tests of panic hooks without GnuCOBOL.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
 pub fn as_cdcics_call<R>(f: impl FnOnce() -> R + std::panic::UnwindSafe) -> Option<R> {
     guarded(f)
 }
 
-#[cfg(feature = "test-hooks")]
-static PANIC_NEXT: AtomicBool = AtomicBool::new(false);
-
-/// Make the next EXEC CICS command of a COBOL program panic, as a bridge bug would. For tests of the
-/// ASRA path through the real entry point.
-#[cfg(feature = "test-hooks")]
+/// Make the next EXEC CICS command of a COBOL program panic, as a bridge bug would. A test seam (debug
+/// builds): the ASRA path through the real entry point.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
 pub fn panic_in_next_command() {
-    PANIC_NEXT.store(true, Ordering::SeqCst);
+    test_seam::NEXT.store(1, Ordering::SeqCst);
 }
 
 /// The `CDCICS` entry point called by the translated COBOL programs. No panic may unwind into libcob
@@ -521,10 +545,8 @@ fn set_resp(eib: &mut [u8], t: &mut Task, resp: i32, resp2: i32) {
 }
 
 fn cdcics_call() -> c_int {
-    #[cfg(feature = "test-hooks")]
-    if PANIC_NEXT.swap(false, Ordering::SeqCst) {
-        panic!("test-hooks: EXEC CICS command panics");
-    }
+    #[cfg(debug_assertions)]
+    test_seam::fire();
     let ctx = CTX.with(|c| c.get());
     if ctx.is_null() {
         return RC_TRANSFER;

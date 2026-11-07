@@ -50,12 +50,13 @@ mod imp {
         if st.as_ref().is_some_and(|s| s.path == path) {
             return Ok(()); // already there
         }
+        // "e": close-on-exec, like Rust's own files
         let file = match st.as_ref() {
             Some(s) => unsafe {
                 libc::fflush(s.file);
-                libc::freopen(name.as_ptr(), c"a".as_ptr(), s.file)
+                libc::freopen(name.as_ptr(), c"ae".as_ptr(), s.file)
             },
-            None => unsafe { libc::fopen(name.as_ptr(), c"a".as_ptr()) },
+            None => unsafe { libc::fopen(name.as_ptr(), c"ae".as_ptr()) },
         };
         if file.is_null() {
             // a failed freopen has closed the stream: forget it (the C stream variables still point at it,
@@ -65,6 +66,9 @@ mod imp {
             return Err(err);
         }
         unsafe {
+            // line-buffered: each line is in the file at once, in order with libcob's direct writes to
+            // descriptor 2, and nothing much is lost if a signal ends the process
+            libc::setvbuf(file, std::ptr::null_mut(), libc::_IOLBF, 0);
             C_STDOUT = file;
             C_STDERR = file;
         }
@@ -141,6 +145,19 @@ mod imp {
             assert!(write_sysout("from a hook\n"));
             assert_eq!(std::fs::read_to_string(&a).unwrap(), "to stdout\nto stderr\nfrom a hook\n");
             assert_eq!(sysout_path().as_deref(), Some(a.as_path()));
+            // a DISPLAY line through the stream, then libcob writing a message prefix straight to the
+            // descriptor (as its runtime warnings do): the file keeps them in that order
+            unsafe {
+                libc::fputs(c"PROCESS ENTER KEY\n".as_ptr(), C_STDOUT);
+                libc::write(libc::fileno(C_STDERR), c"libcob: ".as_ptr().cast(), 8);
+                libc::fputs(c"warning\n".as_ptr(), C_STDERR);
+            }
+            flush();
+            assert_eq!(
+                std::fs::read_to_string(&a).unwrap(),
+                "to stdout\nto stderr\nfrom a hook\nPROCESS ENTER KEY\nlibcob: warning\n",
+                "line-buffered: no interleaving"
+            );
             set_sysout(&a).unwrap(); // the same file again: nothing changes
             set_sysout(&b).unwrap(); // switching files
             unsafe { libc::fputs(c"later\n".as_ptr(), C_STDOUT) };

@@ -224,3 +224,26 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
 - New tests/terminal.rs (carddemo): the real binary in a pseudo-terminal - quit, SIGTERM/SIGHUP, failed
   setup, stack overflow (debug trigger), COBOL init failure, libcob runtime error under the UI. Each of the
   two new cases fails with the reviewed bug put back. Windows tests under Wine pass as well.
+
+### Code review (2026-11-07, eighth `/code-review xhigh`, last round for now): all 13 findings fixed
+- Signal handler restores the terminal crossterm uses (stdin if a terminal, else /dev/tty); a three-state UI
+  flag (off/on/ending) closes the windows before raw mode and during the restore; every signal whose
+  default action ends the process is handled (19, not the real-time ones); a bridge panic that cannot
+  unwind leaves a note that the SIGABRT handler prints.
+- `ensure_on` kept, now tested (tests/terminal.rs: UI taken off mid-session comes back); the cobridge test
+  seams are debug-build-only (no `test-hooks` feature; release binaries contain none); `start()` is the one
+  initialisation; the helper is `in_cobol_call`; sysout line-buffered and close-on-exec (tested against the
+  interleaving); COBOL-region tests stop with check()'s message; terminal tests wait for the screen
+  instead of sleeping, with default signal handling; online.py: rustc's `-->` at any indent, no dead offset.
+
+### Release 1.0.0: downloadable demos for Windows and Linux
+- `carddemo` without arguments (a double click on Windows) shows a demo menu: online screens, nightly
+  batch, transaction report (default range up to today: posting stamps today's date), output-file viewer
+  (records split, HTML statements in the browser), reset, and on Linux with GnuCOBOL 3.2 the original COBOL
+  screens from the shipped modules. Data next to the program; sample data found in `data/EBCDIC` beside it.
+- `rust/tools/package-release.sh` builds `carddemo-1.0.0-windows-x86_64.zip` (only Windows system DLLs) and
+  `carddemo-1.0.0-linux-x86_64.tar.gz` (glibc >= 2.34; the 2.39 symbols are weak), each with the sample
+  data, `docs/demo-quickstart.pdf` (new), LICENSE and NOTICE. DEMO.md, the deck and the README point to it.
+- Checked from the unpacked packages: Linux in a pseudo-terminal (batch, report, viewer, online screens,
+  original COBOL screens), Windows under Wine (the same without COBOL); tests/terminal.rs runs the menu in
+  the release layout.

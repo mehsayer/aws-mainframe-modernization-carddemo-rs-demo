@@ -8,7 +8,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 enum Step {
-    Wait(u64),
+    /// wait (up to 20 s) until the screen text contains this (whitespace ignored: the terminal is not sent
+    /// the blanks between words, only cursor moves)
+    WaitFor(&'static str),
+    /// wait (up to 20 s) until the UI has entered the alternate screen this many times
+    UiOn(usize),
     Keys(&'static [u8]),
     Signal(c_int),
 }
@@ -33,8 +37,13 @@ impl Run {
     }
 
     fn assert_terminal_restored(&self) {
-        assert_eq!(self.count(b"\x1b[?1049h"), 1, "entered the alternate screen once");
-        assert_eq!(self.count(b"\x1b[?1049l"), 1, "left the alternate screen once");
+        self.assert_restored_after(1);
+    }
+
+    /// The UI was put on `times` times and taken off as often, and the terminal is as it was.
+    fn assert_restored_after(&self, times: usize) {
+        assert_eq!(self.count(b"\x1b[?1049h"), times, "entered the alternate screen {times} time(s)");
+        assert_eq!(self.count(b"\x1b[?1049l"), times, "left the alternate screen {times} time(s)");
         assert!(self.lflag & libc::ICANON != 0 && self.lflag & libc::ECHO != 0, "terminal back in canonical mode with echo");
     }
 }
@@ -66,8 +75,14 @@ fn home(name: &str) -> PathBuf {
 
 /// Run `carddemo <args>` in a 30x100 pseudo-terminal with `env` added, driving it with `steps`.
 fn run(args: &[&str], env: &[(&str, String)], stdout_full: bool, steps: &[Step]) -> Run {
+    run_program(Path::new(env!("CARGO_BIN_EXE_carddemo")), Path::new("."), args, env, stdout_full, steps)
+}
+
+/// The same for the program at `prog`, started in directory `cwd`.
+fn run_program(prog: &Path, cwd: &Path, args: &[&str], env: &[(&str, String)], stdout_full: bool, steps: &[Step]) -> Run {
     // everything the child needs is prepared before fork (only async-signal-safe calls after it)
-    let prog = CString::new(env!("CARGO_BIN_EXE_carddemo")).unwrap();
+    let prog = CString::new(prog.to_str().unwrap()).unwrap();
+    let cwd = CString::new(cwd.to_str().unwrap()).unwrap();
     let argv_c: Vec<CString> = std::iter::once(prog.clone()).chain(args.iter().map(|a| CString::new(*a).unwrap())).collect();
     let mut argv: Vec<*const libc::c_char> = argv_c.iter().map(|c| c.as_ptr()).collect();
     argv.push(std::ptr::null());
@@ -87,6 +102,18 @@ fn run(args: &[&str], env: &[(&str, String)], stdout_full: bool, steps: &[Step])
     assert!(pid >= 0, "forkpty");
     if pid == 0 {
         unsafe {
+            // default signal handling, whatever the test runner inherited (nohup ignores SIGHUP)
+            let mut dfl: libc::sigaction = std::mem::zeroed();
+            dfl.sa_sigaction = libc::SIG_DFL;
+            for sig in 1..32 {
+                if sig != libc::SIGKILL && sig != libc::SIGSTOP {
+                    libc::sigaction(sig, &dfl, std::ptr::null_mut());
+                }
+            }
+            let mut none: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut none);
+            libc::sigprocmask(libc::SIG_SETMASK, &none, std::ptr::null_mut());
+            libc::chdir(cwd.as_ptr());
             if stdout_full {
                 let fd = libc::open(full.as_ptr(), libc::O_WRONLY);
                 libc::dup2(fd, 1);
@@ -110,9 +137,22 @@ fn run(args: &[&str], env: &[(&str, String)], stdout_full: bool, steps: &[Step])
             }
         }
     };
+    let wait_until = |out: &mut Vec<u8>, what: &str, done: &dyn Fn(&[u8]) -> bool| {
+        let end = Instant::now() + Duration::from_secs(20);
+        while !done(out) {
+            assert!(Instant::now() < end, "timed out waiting for {what}; output: {}", strip(out));
+            pump(out, 100);
+        }
+    };
     for s in steps {
         match s {
-            Step::Wait(ms) => pump(&mut out, *ms),
+            Step::WaitFor(text) => {
+                let want: String = text.split_whitespace().collect();
+                wait_until(&mut out, text, &|o: &[u8]| strip(o).split_whitespace().collect::<String>().contains(&want))
+            }
+            Step::UiOn(n) => wait_until(&mut out, "the alternate screen", &|o: &[u8]| {
+                o.windows(8).filter(|w| *w == b"\x1b[?1049h").count() >= *n
+            }),
             Step::Keys(k) => {
                 unsafe { libc::write(master, k.as_ptr().cast(), k.len()) };
                 pump(&mut out, 300);
@@ -163,7 +203,7 @@ fn signal(r: &Run) -> Option<c_int> {
 
 #[test]
 fn quit() {
-    let r = run(&["online"], &data("quit"), false, &[Step::Wait(2500), Step::Keys(b"\x11")]);
+    let r = run(&["online"], &data("quit"), false, &[Step::WaitFor("Sign-on"), Step::Keys(b"\x11")]);
     assert_eq!(exit_code(&r), Some(0), "output: {}", strip(&r.out));
     assert!(strip(&r.out).contains("CardDemo"), "sign-on screen drawn");
     r.assert_terminal_restored();
@@ -171,8 +211,8 @@ fn quit() {
 
 #[test]
 fn killed() {
-    for sig in [libc::SIGTERM, libc::SIGHUP] {
-        let r = run(&["online"], &data(&format!("killed-{sig}")), false, &[Step::Wait(2500), Step::Signal(sig)]);
+    for sig in [libc::SIGTERM, libc::SIGHUP, libc::SIGUSR1] {
+        let r = run(&["online"], &data(&format!("killed-{sig}")), false, &[Step::WaitFor("Sign-on"), Step::Signal(sig)]);
         assert_eq!(signal(&r), Some(sig), "ended by the signal");
         r.assert_terminal_restored();
     }
@@ -181,7 +221,7 @@ fn killed() {
 #[test]
 fn setup_fails() {
     // stdout cannot be written: the setup fails after raw mode is on
-    let r = run(&["online"], &data("setup"), true, &[Step::Wait(2500)]);
+    let r = run(&["online"], &data("setup"), true, &[]);
     assert_eq!(exit_code(&r), Some(1));
     assert!(strip(&r.out).contains("No space left on device"), "output: {}", strip(&r.out));
     assert!(r.lflag & libc::ICANON != 0 && r.lflag & libc::ECHO != 0, "terminal back in canonical mode");
@@ -194,7 +234,7 @@ fn stack_overflow() {
     }
     let mut env = data("overflow");
     env.push(("CARDDEMO_TEST_STACK_OVERFLOW", "1".into()));
-    let r = run(&["online"], &env, false, &[Step::Wait(3000)]);
+    let r = run(&["online"], &env, false, &[Step::UiOn(1)]);
     assert_eq!(signal(&r), Some(libc::SIGABRT), "Rust aborts after reporting the overflow");
     assert!(r.after_ui().contains("has overflowed its stack"), "Rust's message reaches the terminal: {:?}", r.after_ui());
     r.assert_terminal_restored();
@@ -210,7 +250,7 @@ fn cobol_init_fails() {
     let Some(_) = cobol() else { return eprintln!("COBOL modules not built: skipped") };
     let mut env = data("cobinit");
     env.push(("COB_RUNTIME_CONFIG", "/nonexistent/runtime.cfg".into()));
-    let r = run(&["online", "--cobol"], &env, false, &[Step::Wait(2500)]);
+    let r = run(&["online", "--cobol"], &env, false, &[]);
     assert_eq!(exit_code(&r), Some(1));
     let text = strip(&r.out);
     assert!(text.contains("the COBOL runtime ended the program"), "reported on the terminal: {text:?}");
@@ -235,14 +275,14 @@ fn cobol_runtime_error_under_the_ui() {
     env.push(("CARDDEMO_COBOL_MODULES", mods.display().to_string()));
     // 8-character fields autoskip to the next field, so no Tab after a full field
     let steps = [
-        Step::Wait(3000),
+        Step::WaitFor("Sign-on"),
         Step::Keys(b"USER0001"),
         Step::Keys(b"PASSWORD"),
         Step::Keys(b"\r"),
-        Step::Wait(1000),
+        Step::WaitFor("Main Menu"),
         Step::Keys(b"9"),
         Step::Keys(b"\r"),
-        Step::Wait(1000),
+        Step::WaitFor("Reports"),
         Step::Keys(b"\t"),
         Step::Keys(b"\t"),
         Step::Keys(b"X"),
@@ -261,4 +301,94 @@ fn cobol_runtime_error_under_the_ui() {
     r.assert_terminal_restored();
     let sysout = std::fs::read_to_string(Path::new(&env[0].1).join("cobol-sysout.log")).unwrap_or_default();
     assert!(sysout.contains("module 'CSUTLDTC' not found"), "libcob's message in the sysout file: {sysout:?}");
+}
+
+#[test]
+fn ui_taken_off_mid_session_comes_back() {
+    if !cfg!(debug_assertions) {
+        return; // the trigger exists in debug builds only
+    }
+    // as if the panic hook had misjudged a panic the bridge then caught: term::ensure_on puts the UI back
+    let mut env = data("uioff");
+    env.push(("CARDDEMO_TEST_UI_OFF", "1".into()));
+    let r = run(&["online"], &env, false, &[Step::UiOn(2), Step::WaitFor("Sign-on"), Step::Keys(b"\x11")]);
+    assert_eq!(exit_code(&r), Some(0), "output: {}", strip(&r.out));
+    r.assert_restored_after(2);
+}
+
+#[test]
+fn cobol_bridge_panic_ends_the_task_and_the_ui_stays() {
+    let Some(_) = cobol().filter(|_| cfg!(debug_assertions)) else { return eprintln!("needs the COBOL modules and a debug build") };
+    let mut env = data("bridgepanic");
+    env.push(("CARDDEMO_TEST_PANIC", "unwind".into()));
+    let r = run(&["online", "--cobol"], &env, false, &[Step::WaitFor("abend ASRA"), Step::Keys(b"\x11")]);
+    assert_eq!(exit_code(&r), Some(0), "the session went on: {}", strip(&r.out));
+    r.assert_terminal_restored();
+    assert!(!r.after_ui().contains("panicked"), "the panic was not printed over the terminal: {:?}", r.after_ui());
+    let sysout = std::fs::read_to_string(Path::new(&env[0].1).join("cobol-sysout.log")).unwrap_or_default();
+    assert!(sysout.contains("test seam: EXEC CICS command panics"), "the panic is in the sysout file: {sysout:?}");
+}
+
+#[test]
+fn cobol_bridge_panic_that_cannot_unwind_is_reported() {
+    let Some(_) = cobol().filter(|_| cfg!(debug_assertions)) else { return eprintln!("needs the COBOL modules and a debug build") };
+    let mut env = data("nounwind");
+    env.push(("CARDDEMO_TEST_PANIC", "nounwind".into()));
+    let r = run(&["online", "--cobol"], &env, false, &[Step::UiOn(1)]);
+    assert_eq!(signal(&r), Some(libc::SIGABRT), "the process aborts");
+    r.assert_terminal_restored();
+    assert!(r.after_ui().contains("could not be caught and ended the program"), "the note reaches the terminal: {:?}", r.after_ui());
+}
+
+#[test]
+fn demo_menu_as_released() {
+    // the release layout: the program with the sample data next to it, started from elsewhere (a double
+    // click), no data directory given: the menu finds the data and keeps its own next to the program
+    let stage = home("release");
+    std::fs::create_dir_all(stage.join("data/EBCDIC")).unwrap();
+    for e in std::fs::read_dir(batch::repro::sample_seed_dir()).unwrap() {
+        let p = e.unwrap().path();
+        std::fs::copy(&p, stage.join("data/EBCDIC").join(p.file_name().unwrap())).unwrap();
+    }
+    let prog = stage.join("carddemo");
+    std::fs::copy(env!("CARGO_BIN_EXE_carddemo"), &prog).unwrap();
+    let steps = [
+        Step::WaitFor("Choose:"),
+        Step::Keys(b"2\r"), // nightly batch
+        Step::WaitFor("CREASTMT: MAXCC=0000"),
+        Step::Keys(b"\r"),
+        Step::Keys(b"4\r"), // output files
+        Step::WaitFor("View file number"),
+        Step::Keys(b"3\r"), // DALYREJS, STATEMNT.HTML, STATEMNT.PS, ...: the text statements
+        Step::WaitFor("START OF STATEMENT"),
+        Step::Keys(b"q"),
+        Step::WaitFor("View file number"),
+        Step::Keys(b"0\r"),
+        Step::WaitFor("Choose:"),
+        Step::Keys(b"3\r"), // the transaction report, default dates (up to today: the batch posted today)
+        Step::WaitFor("Start date"),
+        Step::Keys(b"\r"),
+        Step::Keys(b"\r"),
+        Step::WaitFor("TRANREPT: MAXCC=0000"),
+        Step::Keys(b"\r"),
+        Step::Keys(b"4\r"),
+        Step::WaitFor("View file number"),
+        Step::Keys(b"5\r"), // ..., SYSTRAN, TRANREPT: the report, with its transactions
+        Step::WaitFor("Daily Transaction Report"),
+        Step::WaitFor("Account Total"),
+        Step::Keys(b"q"),
+        Step::WaitFor("View file number"),
+        Step::Keys(b"0\r"),
+        Step::WaitFor("Choose:"),
+        Step::Keys(b"1\r"), // the online screens, and back with Ctrl+Q
+        Step::WaitFor("Sign-on"),
+        Step::Keys(b"\x11"),
+        Step::UiOn(3),
+        Step::Keys(b"0\r"),
+    ];
+    let env = [("RUST_BACKTRACE", "0".to_string())];
+    let r = run_program(&prog, Path::new("/"), &[], &env, false, &steps);
+    assert_eq!(exit_code(&r), Some(0), "output: {}", strip(&r.out));
+    r.assert_restored_after(3); // the viewer twice, the online screens
+    assert!(stage.join("carddemo-data/datasets/AWS.M2.CARDDEMO.STATEMNT.PS").is_file(), "data kept next to the program");
 }

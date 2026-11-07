@@ -7,7 +7,12 @@
 | [`demo/`](demo/) | `python3 demo/demo.py all`: run the original COBOL batch and the Rust batch, then compare the results; `online-cobol` / `online` / `online-compare` for the screens |
 | [`docs/`](docs/) | [Demo guide](docs/DEMO.md), requirements, manual test suite, presentation (PDF) |
 
-Quick start (needs Rust, Python 3 and GnuCOBOL):
+**Try it without installing anything:** download the demo for Windows (zip: unpack, double-click
+`carddemo.exe`) or Linux (tar.gz: unpack, run `./carddemo`) from
+[Releases](https://github.com/mehsayer/aws-mainframe-modernization-carddemo-rs-demo/releases); instructions in
+[`docs/demo-quickstart.pdf`](docs/demo-quickstart.pdf).
+
+Quick start from the sources (needs Rust, Python 3 and GnuCOBOL):
 
 ```sh
 python3 demo/demo.py all       # COBOL run, Rust run, comparison

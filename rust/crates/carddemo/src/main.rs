@@ -11,23 +11,29 @@ use ratatui::widgets::Paragraph;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+mod demo;
 mod term;
+
+const DEFAULT_HOME: &str = "carddemo-data";
 
 #[derive(Parser)]
 #[command(name = "carddemo", version, about = "AWS CardDemo, translated from COBOL/CICS/VSAM to Rust")]
 struct Cli {
     /// Data directory (SQLite store and sequential data sets)
-    #[arg(long, env = "CARDDEMO_HOME", default_value = "carddemo-data")]
+    #[arg(long, env = "CARDDEMO_HOME", default_value = DEFAULT_HOME)]
     home: PathBuf,
     /// Directory with the shipped EBCDIC sample data (cobol/app/data/EBCDIC)
     #[arg(long, env = "CARDDEMO_SEED")]
     seed: Option<PathBuf>,
+    /// Without a command: the demo menu (what a double click on the program shows)
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// The demo menu: online screens, nightly batch, report, output files (also: no command at all)
+    Demo,
     /// Reset the data store to the shipped sample data
     Reset,
     /// List the batch jobs
@@ -72,23 +78,33 @@ enum Cmd {
     },
 }
 
+/// The shipped sample data: `--seed`; else, from the current directory upwards, the repository's
+/// `cobol/app/data/EBCDIC` (or `app/data/EBCDIC` inside cobol/); else next to the program (`data/EBCDIC`,
+/// the release layout) or in the repository it was built in.
 fn find_seed(explicit: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(p) = explicit {
         return Ok(p);
     }
-    let mut dir = std::env::current_dir()?;
-    loop {
-        // works from anywhere inside the repository (cobol/app/data/EBCDIC) or inside cobol/
-        for rel in ["cobol/app/data/EBCDIC", "app/data/EBCDIC"] {
-            let c = dir.join(rel);
-            if c.is_dir() {
-                return Ok(c);
+    let up = |mut dir: PathBuf| -> Option<PathBuf> {
+        loop {
+            for rel in ["cobol/app/data/EBCDIC", "app/data/EBCDIC"] {
+                let c = dir.join(rel);
+                if c.is_dir() {
+                    return Some(c);
+                }
+            }
+            if !dir.pop() {
+                return None;
             }
         }
-        if !dir.pop() {
-            bail!("sample data not found: pass --seed <dir with AWS.M2.CARDDEMO.*.PS>");
-        }
-    }
+    };
+    let beside = demo::exe_dir().map(|d| d.join("data").join("EBCDIC")).filter(|d| d.is_dir());
+    std::env::current_dir()
+        .ok()
+        .and_then(up)
+        .or(beside)
+        .or_else(|| demo::exe_dir().and_then(up))
+        .context("sample data not found: pass --seed <dir with AWS.M2.CARDDEMO.*.PS>")
 }
 
 fn open_store(home: &Path) -> Result<vsam::Vsam> {
@@ -98,7 +114,11 @@ fn open_store(home: &Path) -> Result<vsam::Vsam> {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    match cli.cmd {
+    let Some(cmd) = cli.cmd else {
+        return demo_menu(cli.home, cli.seed);
+    };
+    match cmd {
+        Cmd::Demo => demo_menu(cli.home, cli.seed)?,
         Cmd::Reset => {
             let seed = find_seed(cli.seed)?;
             let v = open_store(&cli.home)?;
@@ -171,6 +191,19 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The demo menu. Its data lives next to the program unless `--home`/`CARDDEMO_HOME` says otherwise (a
+/// double click starts it in an unknown directory).
+fn demo_menu(home: PathBuf, seed: Option<PathBuf>) -> Result<()> {
+    let home = if home == Path::new(DEFAULT_HOME) { demo::exe_dir().map(|d| d.join(DEFAULT_HOME)).unwrap_or(home) } else { home };
+    let r = demo::run(&home, find_seed(seed).ok());
+    if let Err(e) = &r {
+        // the console window of a double click closes at once: show the error first
+        eprintln!("Error: {e:#}");
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+    r
 }
 
 fn parse_aid(k: &str) -> Result<Aid> {
@@ -304,6 +337,10 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     let mut sess = Session::default();
     region.run(&mut sess, Some(tran), Aid::Enter);
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
+    #[cfg(debug_assertions)]
+    if std::env::var_os("CARDDEMO_TEST_UI_OFF").is_some() {
+        term::end(); // tests/terminal.rs: the UI taken off while the program goes on (term::ensure_on)
+    }
     (|| -> Result<()> {
         loop {
             term::ensure_on(&mut term)?;

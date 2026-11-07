@@ -426,6 +426,14 @@ python3 demo/demo.py online-compare  # → 338/338 screens identical
 
 Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.
 
+## Try it yourself: the download
+
+- GitHub, **Releases**: the Rust translation as one program with the sample data
+- **Windows**: unpack the zip, **double-click `carddemo.exe`**
+- **Linux**: unpack the tar.gz, run `./carddemo` (with GnuCOBOL: the original COBOL screens too)
+- A menu: online screens, nightly batch, transaction report, output-file viewer
+- No installation, no mainframe, no COBOL needed; instructions in `demo-quickstart.pdf`
+
 \keypoint{Questions: Illia Burov}
 
 # Appendix
