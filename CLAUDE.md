@@ -10,7 +10,7 @@ Same screens, messages, record bytes and reports as the original, including its 
 | `cobol/` | The original AWS CardDemo, unchanged: `app/cbl` programs, `app/cpy` copybooks, `app/bms` screens, `app/jcl` jobs, `app/data` sample data | **Read-only reference** |
 | `rust/` | The translation: Cargo workspace (`crates/cobol`, `vsam`, `cics`, `online`, `batch`, `carddemo`, `cobridge`), `difftest/` (GnuCOBOL comparisons), `cobridge/` (CICS translator for the original online programs), `tools/` (generators, metrics) | The product |
 | `demo/` | `demo.py`: COBOL and Rust batch and online screens, side by side, and their comparisons | Demo tooling |
-| `docs/` | Requirements, manual test suite, demo guide, presentation (Markdown sources + built PDFs) | Deliverables |
+| `docs/` | Requirements, architecture (COBOL and Rust, derived from the code), manual test suite, demo guide, presentation (Markdown sources + built PDFs) | Deliverables |
 
 ## Commands
 
@@ -28,7 +28,7 @@ python3 rust/difftest/online.py       # run the online tests on Rust and on the 
 CARDDEMO_REGION=cobol cargo test --release -p online --tests -- --test-threads=1   # online tests on COBOL
 python3 docs/tests/execute.py         # execute the manual test suite (42 cases) -> docs/tests/results.json
 python3 demo/demo.py all              # demo: COBOL run, Rust run, compare
-sh docs/build-all.sh                  # rebuild requirements / test suite / presentation / demo quick-start PDFs
+sh docs/build-all.sh                  # rebuild all PDFs (requirements, architecture, test suite, presentation, quick start)
 sh rust/tools/package-release.sh      # release downloads (Windows zip, Linux tar.gz) -> rust/target/packages/
 sh rust/tools/regen-records.sh        # regenerate crates/cobol/src/copybooks.rs from cobol/app/cpy
 ```

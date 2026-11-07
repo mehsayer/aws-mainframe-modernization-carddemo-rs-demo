@@ -39,6 +39,8 @@ or a COBOL runtime.
 | Live demo guide (from the sources, COBOL and Rust side by side) | [docs/DEMO.md](docs/DEMO.md) | |
 | Presentation | [docs/deck/progress.md](docs/deck/progress.md) | [progress-presentation.pdf](docs/progress-presentation.pdf) |
 | Requirements specification | [docs/requirements/](docs/requirements/) | [requirements.pdf](docs/requirements.pdf) |
+| Architecture and interfaces of the original (COBOL) | [docs/architecture/cobol.md](docs/architecture/cobol.md) | [architecture-cobol.pdf](docs/architecture-cobol.pdf) |
+| Architecture and API of the translation (Rust) | [docs/architecture/rust.md](docs/architecture/rust.md) | [architecture-rust.pdf](docs/architecture-rust.pdf) |
 | Manual test suite and execution log | [docs/tests/manual-test-suite.md](docs/tests/manual-test-suite.md) | [manual-test-suite.pdf](docs/manual-test-suite.pdf) |
 | Differential test reports (batch, online) | [docs/difftest/report.md](docs/difftest/report.md), [online-report.md](docs/difftest/online-report.md) | |
 | Progress log | [docs/progress-log.md](docs/progress-log.md) | |

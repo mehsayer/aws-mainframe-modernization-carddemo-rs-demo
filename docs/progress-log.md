@@ -262,3 +262,18 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
   The low-priority findings are left for review by the user.
 - Release 1.0.0 rebuilt with stripped programs (Linux 4.8 MB, Windows 6.1 MB) and the icon, tested from the
   packages on Linux (pty, incl. the original COBOL screens) and Windows (Wine).
+
+### 2026-11-07: architecture and API documents, derived from the code
+- `docs/architecture/cobol.md` -> `architecture-cobol.pdf` (13 pages): the original's subsystems, transactions and
+  programs with their screens and file access, navigation and menu tables, the commarea (`COCOM01Y`) with
+  offsets, CICS resources, job streams, batch program interfaces (DD names, organisation, keys, records),
+  called routines, VSAM clusters and alternate indexes, sequential data sets and GDGs, record layouts,
+  relationships, external interfaces.
+- `docs/architecture/rust.md` -> `architecture-rust.pdf` (9 pages): crates and dependencies, the public API of
+  each crate, the COBOL bridge (translation scheme, EIB layout), runtime flows, the COBOL-to-Rust mapping,
+  storage, verification, build and release.
+- Both state on the title page and in their first chapter that they were derived from the source code (commit
+  49ee1a5), with extraction scripts for the CSD, `EXEC CICS` commands, `SELECT ... ASSIGN`, `DEFINE CLUSTER` and
+  JCL steps, and that the code is authoritative where they differ. Claims were checked against the code; for
+  example `CARDAIX` is defined but used by no `EXEC CICS` command, and the batch runner records return codes
+  but does not evaluate the JCL's `COND`.
