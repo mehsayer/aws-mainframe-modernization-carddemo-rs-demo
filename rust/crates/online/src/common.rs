@@ -11,7 +11,7 @@ pub const CCDA_MSG_THANK_YOU: &str = "Thank you for using CardDemo application..
 pub const CCDA_MSG_INVALID_KEY: &str = "Invalid key pressed. Please see below...         ";
 
 /// Clock (FUNCTION CURRENT-DATE / ASKTIME); `CARDDEMO_NOW` overrides it for tests.
-pub use cobol::clock::{fixed_now, now};
+pub use cobol::clock::now;
 
 /// POPULATE-HEADER-INFO
 pub fn header(map: &mut Map, tranid: &str, pgm: &str) {

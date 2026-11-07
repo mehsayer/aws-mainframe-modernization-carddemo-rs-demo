@@ -143,3 +143,22 @@ Totals after session 4 (tools/usage.py): ≈3.1 h active, ≈0.8M output tokens.
 - execute.py: a failed comparison run is kept in rust/difftest/out-online-failed and TC-DIF-01 logged as
   Fail; "Not run" only when cobc is missing.
 - The bridge calls `cobol::clock` directly.
+
+### Code review (2026-11-07, fourth `/code-review xhigh`): all 15 findings fixed
+Most findings were in the previous rounds' own fixes, so this round removes layers instead of adding one:
+- One panic hook, owned by the TUI: the TUI sets up raw mode and the alternate screen itself (ratatui's
+  `init()` would add its hook) and its hook skips the terminal restore while `cobridge::in_cdcics()`. The
+  bridge installs no hook any more; a bridge panic is printed by the standard hook (into the sysout file,
+  with the usual backtrace rules). `tui_end()` restores once, whoever comes first (normal end, panic hook,
+  exit handler), with ratatui's non-printing `try_restore`. Test in carddemo (fails without the check).
+- The whole CDCICS body, including the ASRA handling of a panicked command, runs inside the guard; if that
+  handling panics too, `run()` ends the task with ASRA.
+- One locked sysout state (file, path, saved descriptors): starting and ending a redirect cannot interleave;
+  `restore_stdio()` returns the sysout path when a redirect was active (the exit handler's message).
+- Online tests: the COBOL sysout is `CARDDEMO_COBOL_SYSOUT` (online.py: next to the screen-log directory,
+  not in it), else `target/tmp/cobol-sysout-<test>.log`, no shared /tmp file.
+- execute.py: an old out-online-failed is removed first; without cobc the comparison is not attempted
+  (TC-DIF-01 "Not run"); a failed comparison always leaves out-online-failed/output.txt.
+- `as_cdcics_call` only with cobridge's `test-hooks` feature (carddemo's tests); no unused clock re-export.
+- Checked by hand: the TUI (Rust and --cobol) in a pseudo-terminal enters and leaves the alternate screen
+  once and exits cleanly.

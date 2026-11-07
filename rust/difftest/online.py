@@ -31,8 +31,10 @@ TESTS = {}  # target -> region -> test name -> {"result": "ok"|"FAILED", "note":
 
 def run(target, region, logdir):
     print(f"  {target}: {region} ...", file=sys.stderr, flush=True)
+    # screen logs: one <test name>.log per test in logdir (the COBOL sysout goes next to it, not into it);
     # absolute module directory for the test binaries, which run in another working directory
-    env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir), CARDDEMO_COBOL_MODULES=str(cicsprep.modules_dir()))
+    env = dict(os.environ, CARDDEMO_SCREEN_LOG=str(logdir), CARDDEMO_COBOL_MODULES=str(cicsprep.modules_dir()),
+               CARDDEMO_COBOL_SYSOUT=str(logdir.parent / f"{region}-sysout.log"))
     if region == "cobol":
         env["CARDDEMO_REGION"] = "cobol"
     r = subprocess.run(["cargo", "test", "--release", "-p", "online", "--test", target, "--", "--test-threads=1"],
@@ -122,7 +124,6 @@ def main():
             d = OUT / target / region
             d.mkdir(parents=True)
             res[region] = run(target, region, d)
-        # one <test name>.log per test (tests/common log_screen); the COBOL sysout file is cobol-sysout.txt
         tests = sorted({p.name for p in (OUT / target / "rust").glob("*.log")} | {p.name for p in (OUT / target / "cobol").glob("*.log")})
         t_same = 0
         for name in tests:

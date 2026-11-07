@@ -25,41 +25,41 @@ RESULTS = os.path.join(OUT_ONLINE, "results.json")
 FAILED = os.path.join(RS, "difftest", "out-online-failed")  # a failed comparison run, kept for diagnosis
 
 
-failure = ""  # why the comparison run gave no result
-
-
 def run_online(*args):
-    """Run online.py; its results.json, or None if this run did not write one. online.py writes results.json
-    last (also when screens differ, with exit code 1), and an earlier run's file is removed first, so a file
-    found afterwards is this run's."""
+    """Run online.py: (its results.json or None if this run did not produce a valid one, why not, its output).
+    online.py writes results.json last (also when screens differ, with exit code 1), and an earlier run's
+    file is removed first, so a file found afterwards is this run's."""
     if os.path.exists(RESULTS):
         os.remove(RESULTS)
     r = subprocess.run([sys.executable, ONLINE, *args], cwd=RS, capture_output=True, text=True)
-    global failure
-    res = json.load(open(RESULTS)) if os.path.exists(RESULTS) else None
+    res, why = json.load(open(RESULTS)) if os.path.exists(RESULTS) else None, ""
     if res is None:
-        failure = f"did not complete (exit code {r.returncode})"
+        why = f"did not complete (exit code {r.returncode})"
     elif r.returncode not in (0, 1) or (r.returncode == 0) != bool(res.get("ok")):
-        failure, res = f"exit code {r.returncode} does not match its results", None
+        res, why = None, f"exit code {r.returncode} does not match its results"
     if res is None:
-        sys.stderr.write(f"online.py {' '.join(args)} {failure}:\n{r.stderr[-2000:]}\n")
-        if not args and os.path.isdir(OUT_ONLINE):
-            # the --rust-only fallback clears out-online: keep this run's report and screen logs
-            shutil.rmtree(FAILED, ignore_errors=True)
-            shutil.move(OUT_ONLINE, FAILED)
-            with open(os.path.join(FAILED, "stderr.txt"), "w") as f:
-                f.write(r.stdout + r.stderr)
-    return res
+        sys.stderr.write(f"online.py {' '.join(args)} {why}:\n{r.stderr[-2000:]}\n")
+    return res, why, r.stdout + r.stderr
 
 
-online = run_online()
-if online is not None:
-    shutil.rmtree(FAILED, ignore_errors=True)  # an earlier failure's output no longer applies
+# an earlier run's failure output does not describe this run (fails loudly if it cannot be removed)
+if os.path.exists(FAILED):
+    shutil.rmtree(FAILED)
 no_cobol = shutil.which("cobc") is None
+online, failure = None, ""
+if not no_cobol:
+    online, failure, output = run_online()
+    if online is None:
+        # the --rust-only run below clears out-online: keep what this run left, with its output
+        if os.path.isdir(OUT_ONLINE):
+            shutil.move(OUT_ONLINE, FAILED)
+        os.makedirs(FAILED, exist_ok=True)
+        with open(os.path.join(FAILED, "output.txt"), "w") as f:
+            f.write(output)
 if online is None:  # no GnuCOBOL, or the comparison failed: the same tests on Rust only (same parser and format)
-    rust_run = run_online("--rust-only")
+    rust_run, why, _ = run_online("--rust-only")
     if rust_run is None:
-        sys.exit("the scripted test suite could not run")
+        sys.exit(f"the scripted test suite could not run: online.py --rust-only {why}")
     tests = rust_run["tests"].get("manual_suite", {})
 else:
     tests = online["tests"].get("manual_suite", {})

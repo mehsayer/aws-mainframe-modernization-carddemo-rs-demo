@@ -294,14 +294,7 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     region.run(&mut sess, Some(tran), Aid::Enter);
     let mut ui = Ui { cursor: sess.screen.cursor, status: String::new() };
 
-    let mut term = ratatui::init();
-    if cobol {
-        // ratatui::init() wrapped the panic hook (the first COBOL call above has already installed the
-        // bridge's): install the bridge's check again on top, so a panic inside an EXEC CICS call (an
-        // ASRA abend, the UI keeps running) does not run ratatui's terminal restore
-        cobridge::install_panic_hook();
-    }
-    TUI_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
+    let mut term = tui_start()?;
     let res = (|| -> Result<()> {
         loop {
             term.draw(|f| draw(f, &sess, &ui))?;
@@ -333,12 +326,46 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
         }
         Ok(())
     })();
-    TUI_ACTIVE.store(false, std::sync::atomic::Ordering::SeqCst);
-    ratatui::restore();
+    tui_end();
     res
 }
 
-/// True while the full-screen UI is on the terminal (the exit handler restores the terminal only then).
+/// Put the UI on the terminal: raw mode and the alternate screen, as `ratatui::try_init()` does, but with
+/// this program's panic hook ([`tui_panic_hook`]) instead of ratatui's.
+fn tui_start() -> Result<ratatui::DefaultTerminal> {
+    use crossterm::{execute, terminal};
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| std::panic::set_hook(tui_panic_hook(std::panic::take_hook(), tui_end)));
+    terminal::enable_raw_mode()?;
+    TUI_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
+    execute!(std::io::stdout(), terminal::EnterAlternateScreen)?;
+    Ok(Terminal::new(CrosstermBackend::new(std::io::stdout()))?)
+}
+
+/// Take the UI off the terminal, once: whichever comes first (the normal end, the panic hook, the exit
+/// handler) restores it, so a second LeaveAlternateScreen cannot move the cursor over later output.
+/// Never panics (it runs in a panic hook and an exit handler).
+fn tui_end() {
+    if TUI_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        let _ = ratatui::try_restore();
+    }
+}
+
+type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
+
+/// The UI's panic hook: take the UI off the terminal (`end`), then the earlier hook prints the panic.
+/// Not for a panic inside an EXEC CICS call of the COBOL bridge: the bridge catches it and ends the task
+/// with ASRA while the UI keeps running, and the panic message goes to the sysout file.
+fn tui_panic_hook(prev: PanicHook, end: fn()) -> PanicHook {
+    Box::new(move |info| {
+        if !cobridge::in_cdcics() {
+            end();
+        }
+        prev(info);
+    })
+}
+
+/// True while the full-screen UI is on the terminal (see [`tui_end`]).
 static TUI_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn aid_of(k: &KeyEvent) -> Option<Aid> {
@@ -474,20 +501,52 @@ fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
     cobridge::check().map_err(anyhow::Error::msg)?;
     cobridge::set_sysout(&home.join("cobol-sysout.log"))?;
     // Runs at every process exit. stdout/stderr are still redirected to the sysout file exactly when
-    // libcob ends the process from inside a COBOL call: put them back first, restore the terminal if
-    // the UI is still on screen (a normal exit has already restored it; a Rust panic leaves it on), and
-    // name the sysout file only in the libcob case. Nothing here may panic (no unwinding out of exit).
+    // libcob ends the process from inside a COBOL call: put them back first, take the UI off the terminal
+    // if nothing has yet (normal end and panic hook already have), and name the sysout file only in the
+    // libcob case. Nothing here may panic (no unwinding out of exit).
     extern "C" fn restore_terminal() {
         let ended_in_cobol = cobridge::restore_stdio();
-        if TUI_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst) {
-            ratatui::restore();
-        }
-        if ended_in_cobol {
+        tui_end();
+        if let Some(file) = ended_in_cobol {
             use std::io::Write;
-            let file = cobridge::sysout_path().map(|p| p.display().to_string()).unwrap_or_else(|| "the COBOL sysout file".into());
-            let _ = writeln!(std::io::stderr(), "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {file}");
+            let _ = writeln!(
+                std::io::stderr(),
+                "carddemo: the COBOL runtime ended the program (runtime error or STOP RUN); its messages are in {}",
+                file.display()
+            );
         }
     }
     unsafe { libc::atexit(restore_terminal) };
     Ok(cobridge::region(v))
+}
+
+#[cfg(test)]
+mod tests {
+    // The only test in this binary: it replaces the process's panic hook.
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static ENDS: AtomicUsize = AtomicUsize::new(0);
+    static PRINTS: AtomicUsize = AtomicUsize::new(0);
+
+    #[test]
+    fn panic_hook_takes_the_ui_off_except_for_bridge_panics() {
+        let saved = std::panic::take_hook();
+        // `end` and the earlier hook only count, so nothing touches the terminal or prints
+        std::panic::set_hook(tui_panic_hook(Box::new(|_| {
+            PRINTS.fetch_add(1, Ordering::SeqCst);
+        }), || {
+            ENDS.fetch_add(1, Ordering::SeqCst);
+        }));
+        let bridge = cobridge::as_cdcics_call(|| panic!("bridge bug"));
+        let in_bridge_after = cobridge::in_cdcics();
+        let rust = std::panic::catch_unwind(|| panic!("rust bug"));
+        std::panic::set_hook(saved);
+
+        assert_eq!(bridge, None::<()>, "the bridge catches its panic");
+        assert!(!in_bridge_after, "in_cdcics() is false again after a bridge panic");
+        assert!(rust.is_err());
+        assert_eq!(ENDS.load(Ordering::SeqCst), 1, "UI taken off for the Rust panic only");
+        assert_eq!(PRINTS.load(Ordering::SeqCst), 2, "both panics printed by the earlier hook");
+    }
 }

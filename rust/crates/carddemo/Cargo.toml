@@ -19,3 +19,7 @@ libc.workspace = true
 # `carddemo online --cobol`: the original COBOL programs on the CICS bridge. libcob is loaded at run
 # time, so building needs no GnuCOBOL; only `--cobol` does.
 cobridge = { path = "../cobridge" }
+
+[dev-dependencies]
+# cobridge::as_cdcics_call, for the panic hook test
+cobridge = { path = "../cobridge", features = ["test-hooks"] }

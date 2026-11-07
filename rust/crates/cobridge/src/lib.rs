@@ -16,7 +16,6 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Mutex, Once, OnceLock};
 use vsam::{Browse, Resp};
 
@@ -99,29 +98,30 @@ fn cob() -> &'static Cob {
     COB.get_or_init(load_cob).as_ref().expect("libcob checked by cobridge::check()")
 }
 
-/// Where COBOL DISPLAY output and libcob messages go while a program runs (see [`set_sysout`]).
-static SYSOUT: Mutex<Option<std::fs::File>> = Mutex::new(None);
-/// Its path, for messages that point the user to it (see [`sysout_path`]).
-static SYSOUT_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+/// Where COBOL DISPLAY output and libcob messages go while a program runs (see [`set_sysout`]), and the
+/// original stdout/stderr while a program call has them redirected there. One lock for all of it, so
+/// starting and ending a redirect cannot interleave between threads.
+struct Sysout {
+    file: Option<(std::fs::File, PathBuf)>,
+    /// the original stdout and stderr, saved while a redirect is active
+    saved: Option<(c_int, c_int)>,
+}
+
+static SYSOUT: Mutex<Sysout> = Mutex::new(Sysout { file: None, saved: None });
+
+/// The sysout state. Never held across a COBOL call, so an exit handler that libcob runs from inside a
+/// call can take it; a poisoned lock still holds valid descriptors.
+fn sysout() -> std::sync::MutexGuard<'static, Sysout> {
+    SYSOUT.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 /// Send the COBOL programs' stdout and stderr (DISPLAY, libcob warnings and errors) to `path` while they
 /// run, so they cannot disturb a full-screen terminal UI. The file is opened once.
 pub fn set_sysout(path: &std::path::Path) -> std::io::Result<()> {
     let f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
-    *SYSOUT.lock().unwrap_or_else(|e| e.into_inner()) = Some(f);
-    *SYSOUT_PATH.lock().unwrap_or_else(|e| e.into_inner()) = Some(path.to_path_buf());
+    sysout().file = Some((f, path.to_path_buf()));
     Ok(())
 }
-
-/// The file given to [`set_sysout`], if any. Does not block (None if another thread holds the lock),
-/// so an exit handler can call it.
-pub fn sysout_path() -> Option<PathBuf> {
-    SYSOUT_PATH.try_lock().ok()?.clone()
-}
-
-/// The original stdout/stderr while a redirect is active (-1 otherwise), so [`restore_stdio`] can put
-/// them back even when libcob ends the process from inside a program call.
-static SAVED_FDS: [AtomicI32; 2] = [AtomicI32::new(-1), AtomicI32::new(-1)];
 
 /// stdout/stderr redirected to the sysout file for the duration of one program call.
 struct SysoutRedirect;
@@ -129,11 +129,11 @@ struct SysoutRedirect;
 impl SysoutRedirect {
     fn start() -> Option<SysoutRedirect> {
         use std::os::fd::AsRawFd;
-        let guard = SYSOUT.lock().unwrap_or_else(|e| e.into_inner());
-        let fd = guard.as_ref()?.as_raw_fd();
-        if SAVED_FDS[0].load(Ordering::SeqCst) >= 0 {
+        let mut st = sysout();
+        let fd = st.file.as_ref()?.0.as_raw_fd();
+        if st.saved.is_some() {
             // already redirected: saving now would save the sysout file as the "original" stdout. The
-            // outer redirect restores; this call gets no guard of its own.
+            // active redirect restores; this call gets no guard of its own.
             return None;
         }
         unsafe {
@@ -148,8 +148,7 @@ impl SysoutRedirect {
                 }
                 return None;
             }
-            SAVED_FDS[0].store(out, Ordering::SeqCst);
-            SAVED_FDS[1].store(err, Ordering::SeqCst);
+            st.saved = Some((out, err));
             dup2(fd, 1);
             dup2(fd, 2);
         }
@@ -164,23 +163,20 @@ impl Drop for SysoutRedirect {
 }
 
 /// Put stdout/stderr back if a COBOL call has them redirected. Safe to call at any time, including from
-/// an exit handler. Returns true if a redirect was active; in an exit handler that means libcob is
-/// ending the process from inside a COBOL call (runtime error, STOP RUN) and its message is in the
-/// sysout file.
-pub fn restore_stdio() -> bool {
-    let mut was_active = false;
+/// an exit handler. If a redirect was active, returns the sysout file's path: in an exit handler that
+/// means libcob is ending the process from inside a COBOL call (runtime error, STOP RUN), and its
+/// message is in that file.
+pub fn restore_stdio() -> Option<PathBuf> {
+    let mut st = sysout();
+    let (out, err) = st.saved.take()?;
     unsafe {
         fflush(std::ptr::null_mut());
-        for (target, slot) in [(1, &SAVED_FDS[0]), (2, &SAVED_FDS[1])] {
-            let saved = slot.swap(-1, Ordering::SeqCst);
-            if saved >= 0 {
-                was_active = true;
-                dup2(saved, target);
-                close(saved);
-            }
+        for (target, saved) in [(1, out), (2, err)] {
+            dup2(saved, target);
+            close(saved);
         }
     }
-    was_active
+    Some(st.file.as_ref().map(|f| f.1.clone()).unwrap_or_default())
 }
 
 const RC_TRANSFER: c_int = 99;
@@ -300,8 +296,7 @@ fn pack7(v: u32) -> [u8; 4] {
 /// Run one original COBOL program for the current task (Region calls this like a Rust program).
 pub fn run(t: &mut Task) -> Cr {
     init();
-    static HOOK: Once = Once::new();
-    HOOK.call_once(install_panic_hook);
+    ASRA_FAILED.with(|c| c.set(false));
     let name = CString::new(t.program.trim()).expect("program name");
     if unsafe { (cob().resolve)(name.as_ptr()) }.is_null() {
         return Err(Transfer::Abend("APCT".into()));
@@ -341,6 +336,7 @@ pub fn run(t: &mut Task) -> Cr {
     CTX.with(|c| c.set(prev));
     match ctx.transfer.take() {
         Some(tr) => Err(tr),
+        None if ASRA_FAILED.with(|c| c.replace(false)) => Err(Transfer::Abend("ASRA".into())),
         // GOBACK without EXEC CICS RETURN ends the task like RETURN
         None => Ok(()),
     }
@@ -476,64 +472,55 @@ fn cond_abend(resp: i32) -> String {
 }
 
 thread_local! {
-    /// True while this thread runs a `CDCICS` call (see [`install_panic_hook`]).
+    /// True while this thread runs a `CDCICS` call (see [`in_cdcics`]).
     static IN_CDCICS: Cell<bool> = const { Cell::new(false) };
+    /// Set when even the ASRA handling of a panicked command panicked: [`run`] then ends the task with ASRA.
+    static ASRA_FAILED: Cell<bool> = const { Cell::new(false) };
 }
 
-/// True while the current thread is inside an EXEC CICS command of a COBOL program.
+/// True while the current thread is inside an EXEC CICS command of a COBOL program. A panic there is
+/// caught by the bridge and ends the task with ASRA (the UI keeps running), and stdout/stderr are the
+/// sysout file at that moment. A panic hook that restores the terminal (a TUI's) must skip that while
+/// this is true; the bridge installs no panic hook itself.
 pub fn in_cdcics() -> bool {
     IN_CDCICS.with(|c| c.get())
 }
 
-/// Wrap the current panic hook: a panic inside a `CDCICS` call is caught and becomes an ASRA abend, so
-/// the hook only logs it (with thread, location and, under RUST_BACKTRACE, a backtrace; stderr is the
-/// sysout file then) and does not run the earlier hook. That one may be the TUI's, which restores the
-/// terminal while the UI keeps running. Panics anywhere else go to the earlier hook unchanged.
-///
-/// The first program call installs it; code that sets its own hook later (`ratatui::init()`) calls
-/// this again afterwards, so the bridge's check runs first.
-pub fn install_panic_hook() {
-    let prev = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        if in_cdcics() {
-            use std::io::Write;
-            let name = std::thread::current().name().unwrap_or("<unnamed>").to_string();
-            let bt = std::backtrace::Backtrace::capture();
-            // never panic here: a panic inside the hook aborts the process
-            let _ = writeln!(std::io::stderr(), "cobridge: EXEC CICS command failed, task ends with ASRA\nthread '{name}' {info}\n{bt}");
-        } else {
-            prev(info);
-        }
-    }));
-}
-
 /// Run `call` as a `CDCICS` call: [`in_cdcics`] is true meanwhile, a panic is caught (None).
-fn guarded<F: FnOnce() -> c_int + std::panic::UnwindSafe>(call: F) -> Option<c_int> {
+fn guarded<R>(call: impl FnOnce() -> R + std::panic::UnwindSafe) -> Option<R> {
     let was = IN_CDCICS.with(|c| c.replace(true));
-    let rc = std::panic::catch_unwind(call).ok();
+    let r = std::panic::catch_unwind(call).ok();
     IN_CDCICS.with(|c| c.set(was));
-    rc
+    r
 }
 
-/// [`guarded`] for tests of the panic handling, which cannot make a real command panic.
-#[doc(hidden)]
-pub fn guarded_for_test(call: fn() -> c_int) -> Option<c_int> {
-    guarded(call)
+/// Run `f` the way the bridge runs an EXEC CICS command: [`in_cdcics`] is true meanwhile and a panic is
+/// caught (None). For tests of panic hooks: no real command can be made to panic.
+#[cfg(feature = "test-hooks")]
+pub fn as_cdcics_call<R>(f: impl FnOnce() -> R + std::panic::UnwindSafe) -> Option<R> {
+    guarded(f)
 }
 
-/// The `CDCICS` entry point called by the translated COBOL programs. A panic must not unwind into
-/// libcob (that aborts the process with the terminal in raw mode): it ends the task with ASRA, with
-/// EIBRESP/EIBRESP2 set to 0 as for any abend.
+/// The `CDCICS` entry point called by the translated COBOL programs. No panic may unwind into libcob
+/// (that aborts the process with the terminal in raw mode), so everything runs inside [`guarded`]: a
+/// panicked command ends the task with ASRA (EIBRESP/EIBRESP2 set to 0 as for any abend, an active
+/// HANDLE ABEND LABEL takes it); if that handling panics too, the task ends with ASRA from [`run`].
 extern "C" fn cdcics() -> c_int {
-    guarded(cdcics_call).unwrap_or_else(|| {
-        let ctx = CTX.with(|c| c.get());
-        if ctx.is_null() {
-            return RC_TRANSFER;
-        }
-        let ctx = unsafe { &mut *ctx };
-        set_resp(unsafe { param_bytes(1) }, unsafe { &mut *ctx.task }, 0, 0);
-        abend(ctx, "ASRA".into())
+    guarded(|| std::panic::catch_unwind(cdcics_call).unwrap_or_else(|_| command_panicked())).unwrap_or_else(|| {
+        ASRA_FAILED.with(|c| c.set(true));
+        RC_TRANSFER
     })
+}
+
+/// A command panicked (a bridge bug): the abend CICS gives a program check, ASRA.
+fn command_panicked() -> c_int {
+    let ctx = CTX.with(|c| c.get());
+    if ctx.is_null() {
+        return RC_TRANSFER;
+    }
+    let ctx = unsafe { &mut *ctx };
+    set_resp(unsafe { param_bytes(1) }, unsafe { &mut *ctx.task }, 0, 0);
+    abend(ctx, "ASRA".into())
 }
 
 /// EIBRESP/EIBRESP2 in the program's EIB, and the task's copy.
@@ -854,14 +841,15 @@ mod tests {
         assert!(SysoutRedirect::start().is_none(), "no second redirect while one is active");
         assert_ne!(stdout_id(), before, "still redirected");
         unsafe { libc::write(1, b"inside\n".as_ptr().cast(), 7) };
-        assert!(restore_stdio(), "a redirect was active"); // what the exit handler does during a call
+        // what the exit handler does during a call: it learns where libcob's message went
+        assert_eq!(restore_stdio().as_deref(), Some(log.as_path()), "a redirect was active");
         assert_eq!(stdout_id(), before, "fd 1 back on the original file");
-        assert!(!restore_stdio(), "nothing left to restore");
+        assert_eq!(restore_stdio(), None, "nothing left to restore");
         drop(r); // and the normal end of the call afterwards must not break anything
         assert_eq!(stdout_id(), before);
-        assert!(SAVED_FDS.iter().all(|s| s.load(Ordering::SeqCst) == -1));
+        assert!(sysout().saved.is_none());
         assert_eq!(std::fs::read_to_string(&log).unwrap(), "inside\n");
-        *SYSOUT.lock().unwrap() = None;
+        *sysout() = Sysout { file: None, saved: None };
         let _ = std::fs::remove_file(&log);
     }
 }

@@ -10,14 +10,24 @@ pub fn region() -> Region {
     let seed = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cobol/app/data/EBCDIC");
     batch::repro::reset(&v, &seed).unwrap();
     if cobol_region() {
-        // the COBOL programs' DISPLAY output goes to a file, not into the test harness output; not a
-        // `.log` file, which in the screen-log directory would count as a test's screens (online.py)
-        let dir = std::env::var_os("CARDDEMO_SCREEN_LOG").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-        cobridge::set_sysout(&dir.join("cobol-sysout.txt")).expect("cobol sysout file");
+        cobridge::set_sysout(&cobol_sysout()).expect("cobol sysout file");
         cobridge::region(v)
     } else {
         online::region(v)
     }
+}
+
+/// Where the COBOL programs' DISPLAY output and libcob messages go, instead of into the test harness
+/// output: `CARDDEMO_COBOL_SYSOUT` (online.py sets it, outside the screen-log directory), else
+/// `target/tmp/cobol-sysout-<test file>.log`, started afresh by each test run.
+fn cobol_sysout() -> PathBuf {
+    if let Some(p) = std::env::var_os("CARDDEMO_COBOL_SYSOUT").filter(|v| !v.is_empty()) {
+        return PathBuf::from(p);
+    }
+    let p = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("cobol-sysout-{}.log", env!("CARGO_CRATE_NAME")));
+    static FRESH: std::sync::Once = std::sync::Once::new();
+    FRESH.call_once(|| _ = std::fs::remove_file(&p));
+    p
 }
 
 pub fn cobol_region() -> bool {
