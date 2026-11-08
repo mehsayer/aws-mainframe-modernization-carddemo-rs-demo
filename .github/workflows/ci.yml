@@ -19,7 +19,7 @@ env:
 
 jobs:
   linux:
-    name: Linux build, clippy, tests
+    name: Linux build and clippy
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -34,7 +34,6 @@ jobs:
           workspaces: rust
       - run: cargo build --release
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
 
   windows-cross:
     name: Windows cross build (MinGW, with icon)
@@ -77,7 +76,7 @@ jobs:
       - run: cargo test --release --workspace
 
   cobol-comparisons:
-    name: Comparisons with the COBOL original
+    name: Linux tests and comparisons with the COBOL original
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -115,6 +114,9 @@ jobs:
         working-directory: .
       - name: Translate the online programs
         run: python3 cobridge/cicsprep.py
+      # here because some tests run the original programs on the bridge (smoke, terminal)
+      - name: All tests
+        run: cargo test --workspace
       - name: Batch comparison
         run: python3 difftest/run.py
       - name: Online comparison
