@@ -33,9 +33,11 @@ fn env(name: &str, default: u64) -> u64 {
     std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
-/// Values worth typing: valid keys of the sample data, codes the screens accept, and edge cases.
+/// Values worth typing: valid keys of the sample data, codes the screens accept, and edge cases. No lone "0":
+/// in a search field it becomes 0 plus spaces, and the programs test that numeric item against ZEROS before
+/// any IS NUMERIC check, which is compiler-dependent (GnuCOBOL reads the spaces as zeros).
 const VALUES: &[&str] = &[
-    "", " ", "*", "S", "U", "D", "Y", "N", "X", "1", "2", "3", "5", "6", "7", "8", "9", "10", "11", "12", "0",
+    "", " ", "*", "S", "U", "D", "Y", "N", "X", "1", "2", "3", "5", "6", "7", "8", "9", "10", "11", "12",
     "00000000001", "00000000050", "00000000017", "99999999999", "0500024453765740", "9999999999999999",
     "USER0001", "ADMIN001", "USER0099", "PASSWORD", "U", "A", "JOHN DOE", "Ada", "abc", "12a", "-5", "2022",
     "13", "31", "01", "100.00", "-25.50", "999999999.99",
@@ -45,6 +47,10 @@ const VALUES: &[&str] = &[
 /// anything but digits and blanks there is compiler-dependent (GnuCOBOL turns "-5" into 5, IBM COBOL rejects
 /// it), so only these values are typed into it.
 const OPTION_VALUES: &[&str] = &["", " ", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "99"];
+
+/// COBIL00C moves its account field (X(11)) into a PIC 9(11) key with no numeric check first: anything but a
+/// full-length number there is compiler-dependent (GnuCOBOL reads "6          " as account 6), so only these.
+const PAYMENT_ACCOUNT_VALUES: &[&str] = &["", " ", "00000000001", "00000000050", "00000000017", "99999999999"];
 
 /// Keys, Enter more often than the others.
 const KEYS: &[Aid] = &[
@@ -80,7 +86,11 @@ fn fuzz() {
                     break;
                 }
                 let field = rng.pick(&inputs).clone();
-                let value = if field == "OPTION" { *rng.pick(OPTION_VALUES) } else { *rng.pick(VALUES) };
+                let value = match (field.as_str(), t.map()) {
+                    ("OPTION", _) => *rng.pick(OPTION_VALUES),
+                    ("ACTIDIN", "COBIL0A") => *rng.pick(PAYMENT_ACCOUNT_VALUES),
+                    _ => *rng.pick(VALUES),
+                };
                 log_note(&format!("type {field} = {value:?}"));
                 t.typ(&field, value);
             }

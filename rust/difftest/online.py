@@ -88,8 +88,8 @@ def ended_early(name, out, returncode, run_sysout, sysout_name):
 # Accepted differences: invalid data moved into a numeric field, where the result depends on the compiler.
 # (field-line regex for the Rust run, for the COBOL run, explanation)
 ACCEPTED = [
-    (r'^  TAMT\d{3} "\+00000000\.00" ', r'^  TAMT\d{3} "\+[ .0]{11}" ',
-     "Transaction list, amount of the all-X'00' initialisation record: MOVE of X'00' 'digits' to +99999999.99. "
+    (r'^  (?:TAMT\d{3}|TRNAMT) "\+00000000\.00" ', r'^  (?:TAMT\d{3}|TRNAMT) "\+[ .0]{11}" ',
+     "Transaction list and transaction add (F5, copy of the last transaction), amount of the all-X'00' initialisation record: MOVE of X'00' 'digits' to +99999999.99. "
      "IBM COBOL uses the low half of each byte (0), as the Rust port does; GnuCOBOL leaves the integer digits blank."),
     (r'^  OPTION "[^0-9 "][^"]*" ', r'^  OPTION "00" ',
      "Menu option typed as letters: MOVE of the alphanumeric WS-OPTION-X to the numeric WS-OPTION and back to the "

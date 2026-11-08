@@ -95,6 +95,25 @@ def batch():
     return failed
 
 
+def first_difference(d):
+    """What to look at for a failing online seed: the first real difference (online.py's own comparison, with its
+    accepted differences) and the keystrokes of the screens before it. Later screens usually differ as a result."""
+    sys.path.insert(0, str(HERE))
+    import difflib, online as cmp  # noqa: E402 (online.py's comparison functions)
+    log = d / "fuzz_sessions"
+    a, c = cmp.screens(log / "rust" / "fuzz.log"), cmp.screens(log / "cobol" / "fuzz.log")
+    raw = (log / "rust" / "fuzz.log").read_text(encoding="latin-1").split("----\n")
+    i = next((k for k, (x, y) in enumerate(zip(a, c)) if not cmp.same_screen(x, y)), None)
+    if i is None:
+        return f"    screen counts differ: Rust {len(a)}, COBOL {len(c)}"
+    out = [f"    first difference: screen {i + 1}; before it:"]
+    for k in range(max(0, i - 3), i + 1):
+        notes = [l[2:] for l in raw[k].splitlines() if l.startswith("# ")]
+        out.append(f"      screen {k + 1}: {'; '.join(notes) or '(no input)'}  -> {' '.join(a[k][0].split()[:2])}")
+    out += ["      " + l for l in list(difflib.unified_diff(c[i], a[i], "cobol", "rust", lineterm="", n=0))[:14]]
+    return "\n".join(out)
+
+
 def online():
     first, seeds = arg("--first", 1), arg("--seeds", 3)
     failed = []
@@ -111,6 +130,7 @@ def online():
             shutil.rmtree(d, ignore_errors=True)
             shutil.copytree(HERE / "out-online", d)
             (d / "output.txt").write_text(r.stdout + r.stderr)
+            print(first_difference(d), flush=True)
     return failed
 
 
