@@ -372,10 +372,13 @@ the data store, which is what makes the screen-by-screen comparison possible.
 | Level | Where | What it checks |
 |---|---|---|
 | Unit tests | each crate (`#[cfg(test)]`) | data semantics, VSAM, BMS parsing, panic handling, sysout |
-| Scripted online sessions | `crates/online/tests/` (manual suite 40 cases, users, cards and accounts, transactions, sign-on, review fixes, multi-session) | every screen of each step |
+| Scripted online sessions | `crates/online/tests/` (manual suite 40 cases, users, cards and accounts, transactions, sign-on, review fixes, paragraph coverage, multi-session) | every screen of each step |
 | Batch jobs | `crates/batch/tests/` | the job streams on the sample data |
 | Batch comparison | `difftest/run.py` | the original batch programs (GnuCOBOL) and Rust on the same input: every output data set, report, return code and SYSOUT line (40 outputs, identical) |
-| Online comparison | `difftest/online.py` | the scripted sessions on the Rust programs and on the original COBOL programs (`cobridge`): every screen, field, attribute and cursor (338 screens, identical) |
+| Online comparison | `difftest/online.py` | the scripted sessions on the Rust programs and on the original COBOL programs (`cobridge`): every screen, field, attribute and cursor (399 screens, identical) |
+| Paragraph coverage | `difftest/coverage.py` | which paragraphs of the original programs the two comparisons enter (GnuCOBOL `-ftrace`): 551 of 599 (92%); the script fails if one of the others has no stated reason |
+| Differential fuzzing | `difftest/fuzz.py`, `crates/online/tests/fuzz_sessions.rs` | random daily transaction files through the whole batch comparison, and random keystroke sessions through the online comparison, seeded and repeatable |
+| Continuous integration | `.github/workflows/ci.yml` | on every push: Linux build, clippy and tests, Windows tests and MinGW cross build, all the comparisons above, a few fuzzing seeds, the manual suite |
 | Terminal behaviour | `crates/carddemo/tests/terminal.rs` | the real binary in a pseudo-terminal: quit, kill, failed setup, stack overflow, libcob failures, the demo menu in the release layout |
 | Manual test suite | `docs/tests/` | 42 cases traced to the requirements, executed by script |
 

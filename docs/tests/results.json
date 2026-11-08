@@ -1,5 +1,5 @@
 {
- "date": "2026-11-07",
+ "date": "2026-11-08",
  "tester": "Claude Code (scripted)",
  "results": {
   "TC-SGN-01": {
@@ -168,7 +168,7 @@
   },
   "TC-DIF-01": {
    "result": "Pass (step 2)",
-   "notes": "step 2: 338/338 screens identical; step 1 (interactive side by side) is manual, not run by the script"
+   "notes": "step 2: 399/399 screens identical; step 1 (interactive side by side) is manual, not run by the script"
   }
  }
 }

@@ -51,7 +51,7 @@ header-includes:
 \colhead{What we got}
 
 - All **30 programs** translated, working and tested
-- **40 of 40** batch outputs and **338 of 338** screens identical to the original
+- **40 of 40** batch outputs and **399 of 399** screens identical to the original
 - **41 of 42** test cases passed, the last one's automated part too
 - **15 defects** found in the original and documented
 - About **6 hours** of AI working time, one engineer supervising
@@ -180,7 +180,7 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 |----------------------|----------:|
 | Programs translated | 30 / 30 |
 | Batch outputs vs. COBOL | 40 / 40 identical |
-| Screens vs. COBOL | 338 / 338 identical |
+| Screens vs. COBOL | 399 / 399 identical |
 | Manual test cases | 41 / 42 + 1 (step 2) |
 | Defects found in the original | 15 |
 | AI working time | ≈ 5.9 h |
@@ -206,7 +206,7 @@ work by Illia Burov. This pilot is not affiliated with or endorsed by Amazon Web
 | Customer statements | 50 statements, text and web version (7,900 lines) | ✓ identical |
 | Data export / import | migration file, re-imported files, error file | ✓ identical |
 | File print utilities | 5 programs, incl. packed-decimal outputs | ✓ identical |
-| **Online screens** | 338 screens of 49 scripted terminal sessions: every field, colour, cursor | ✓ identical |
+| **Online screens** | 399 screens of 57 scripted terminal sessions: every field, colour, cursor | ✓ identical |
 
 Original COBOL (free compiler) and Rust run on **the same data, clock and keystrokes**; one command each repeats the checks.
 
@@ -232,8 +232,10 @@ Original COBOL (free compiler) and Rust run on **the same data, clock and keystr
 - Real CICS runs only on licensed mainframes: the original programs get a **stand-in for CICS**, the layer
   the Rust version already uses. Both runs share it, so the comparison checks the business logic
 - All 17 original screen programs run **unchanged**; old and new screens can be shown **side by side**
-- Automated comparison: **338 of 338 screens identical**; on the way it found 13 differences in the Rust
+- Automated comparison: **399 of 399 screens identical**; on the way it found 13 differences in the Rust
   port (all fixed) and 3 more defects of the original (documented)
+- Differential fuzzing with random transactions and keystrokes found 7 more differences (all fixed); the comparisons
+  enter 92% of the COBOL paragraphs, and CI repeats everything on every push
 
 ## Why not run it on an emulated mainframe?
 
@@ -422,7 +424,7 @@ python3 demo/demo.py cobol      # the original COBOL programs
 python3 demo/demo.py rust       # the Rust translation
 python3 demo/demo.py compare    # → IDENTICAL, file by file
 python3 demo/demo.py online-cobol    # original screens; online = Rust
-python3 demo/demo.py online-compare  # → 338/338 screens identical
+python3 demo/demo.py online-compare  # → 399/399 screens identical
 ```
 
 Step-by-step guide for presenters and non-technical audiences: `docs/DEMO.md`.

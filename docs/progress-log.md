@@ -277,3 +277,24 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
   JCL steps, and that the code is authoritative where they differ. Claims were checked against the code; for
   example `CARDAIX` is defined but used by no `EXEC CICS` command, and the batch runner records return codes
   but does not evaluate the JCL's `COND`.
+
+### 2026-11-08: paragraph coverage, differential fuzzing, CI
+- `rust/difftest/coverage.py`: the comparisons enter 551 of 599 COBOL paragraphs (92%). The other 48 each have a
+  reason checked in the source (abend paths after file errors, dead code); `crates/online/tests/coverage_sessions.rs`
+  added 4 sessions for the gaps. The script fails on an uncovered paragraph without a reason.
+- `rust/difftest/fuzz.py`: random DALYTRAN files through `run.py` (3 seeds of 400 records) and random keystroke
+  sessions through `online.py` (14 seeds of about 400 screens): all identical once the bugs below were fixed.
+- Found by fuzzing and fixed in Rust (regression tests in `review_fixes.rs`):
+  - COCRDSLC: `*` in the account field counts as not supplied (the literal is padded for the comparison).
+  - COUSR03C: delete goes on after a failed read, so INVREQ gives "Unable to Update User...".
+  - COACTUPC 3203-SHOW-UPDATED-VALUES: a money field that is not valid shows what was typed.
+  - COACTUPC POSITION CURSOR: the order of the original's EVALUATE, not screen order.
+  - COACTUPC PF12: 3202-SHOW-ORIGINAL-VALUES clears WS-NON-KEY-FLAGS, but the SSN flags are outside that group.
+  - CSUTLDPY (COACTUPC): EDIT-MONTH and EDIT-DAY rewrite the date as digits before CEEDAYS, a month with a leading
+    space is valid, and a day goes through an unsigned item, so its sign is dropped.
+  - COCRDUPC POSITION CURSOR: the BLANK flags count as well as NOT-OK.
+- Compiler-dependent, not fixed: COBIL00C's unchecked account id (FR-BIL-01), the menu OPTION and a lone `0` in search
+  fields are left out of the fuzzing vocabulary; the transaction amount of the X'00' record also shows on transaction
+  add (accepted difference 1 of `online.py`).
+- Online comparison now 399 screens of 57 sessions.
+- `.github/workflows/ci.yml`: Linux, Windows and the COBOL comparisons (GnuCOBOL 3.2 built from source and cached).

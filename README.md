@@ -20,9 +20,11 @@ or a COBOL runtime.
   bill payment, reports, user administration) and the 13 batch programs with their JCL jobs (posting,
   interest, statements, transaction report, file utilities).
 - **Proven identical to the original**: the original COBOL programs are compiled with GnuCOBOL and run on
-  the same data. All 40 batch outputs match byte for byte. All 338 screens of the scripted online sessions
+  the same data. All 40 batch outputs match byte for byte. All 399 screens of the scripted online sessions
   match field by field, including colours, attributes and the cursor; the online originals run unchanged
-  on a small CICS stand-in (`rust/cobridge`).
+  on a small CICS stand-in (`rust/cobridge`). The comparisons enter 92% of the original's COBOL paragraphs, with
+  a stated reason for each of the others; random transaction files and keystroke sessions (differential fuzzing) compare
+  the same way, and [CI](.github/workflows/ci.yml) runs all of it on every push.
 - **Specified and tested**: a requirements specification (functional and non-functional requirements,
   traced to the COBOL sources), a manual test suite of 42 cases with its execution log (41 passed by script, the 42nd
   partly manual), and 15 defects of the original found and documented.

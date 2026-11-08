@@ -235,7 +235,7 @@ transactions, payments, reports) on both systems and compares every screen: ever
 attribute and the cursor position. It ends with:
 
 ```text
-    Screens compared: 338; identical: 338 (including 2 accepted compiler difference(s), below).
+    Screens compared: 399; identical: 399 (including 2 accepted compiler difference(s), below).
     Overall: all screens identical, all tests pass on both
 ```
 
@@ -258,7 +258,7 @@ codes and console messages. It ends with **"Overall: all outputs identical"**. T
 - **Speed.** The translation of about 27,000 lines of COBOL, its documents and both proofs took about
   three hours of the AI's working time, spread over several sessions, plus a person reviewing the plan and
   the results.
-- **Both halves proven.** Batch: 40 outputs identical. Online: 338 screens identical.
+- **Both halves proven.** Batch: 40 outputs identical. Online: 399 screens identical.
 - **Proof, not promises.** The new system is checked against the old one by running both, not by reading
   code. The checks are repeatable: anyone can run the commands above.
 - **The AI found problems in the original.** Fifteen defects are documented in the requirements

@@ -44,7 +44,7 @@ shown, and nothing after it runs.
 
 | ID | Requirement |
 |-----|------------------------------|
-| FR-BIL-01 | Input: account id (11) and a confirmation (Y/N). Blank account id → `Acct ID can NOT be empty...`. |
+| FR-BIL-01 | Input: account id (11) and a confirmation (Y/N). Blank account id → `Acct ID can NOT be empty...`. The account id is not checked for digits before it is moved to the PIC 9(11) key, so any other input is compiler-dependent (GnuCOBOL reads `6` followed by spaces as account 6; the Rust port uses the characters as typed, so that account is not found). |
 | FR-BIL-02 | The account is read for update. Not found → `Account ID NOT found...`. Other error → `Unable to lookup Account...`. The current balance is shown as `+9999999999.99`. |
 | FR-BIL-03 | If the balance is ≤ 0 → `You have nothing to pay...`. |
 | FR-BIL-04 | Confirmation blank → the balance is shown with `Confirm to make a bill payment...`. `N`/`n` → screen cleared. Any value other than Y/N → `Invalid value. Valid values are (Y/N)...`. |

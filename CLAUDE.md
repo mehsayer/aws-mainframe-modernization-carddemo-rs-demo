@@ -26,6 +26,9 @@ python3 -m unittest rust/difftest/test_online.py               # online.py's rep
 python3 rust/difftest/online.py       # run the online tests on Rust and on the original COBOL, compare screens
                                       #   (--rust-only without GnuCOBOL; results in difftest/out-online/)
 CARDDEMO_REGION=cobol cargo test --release -p online --tests -- --test-threads=1   # online tests on COBOL
+python3 rust/difftest/coverage.py     # COBOL paragraphs the comparisons enter; every other one needs a reason (out-coverage/coverage.md)
+python3 rust/difftest/fuzz.py batch   # random daily transactions, all batch outputs compared (--seeds N --first S --records R)
+python3 rust/difftest/fuzz.py online  # random keystroke sessions, every screen compared (--seeds N --first S --sessions K --steps T)
 python3 docs/tests/execute.py         # execute the manual test suite (42 cases) -> docs/tests/results.json
 python3 demo/demo.py all              # demo: COBOL run, Rust run, compare
 sh docs/build-all.sh                  # rebuild all PDFs (requirements, architecture, test suite, presentation, quick start)
