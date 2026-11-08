@@ -309,3 +309,12 @@ claims to be generated; rust/README's command list; the quick-start guide no lon
 detected; `ast.literal_eval` instead of `eval` in run.py.
 Left on purpose (user's decision): the hard-coded transcript folder of usage.py and phase_metrics.py, and more unit tests
 for the online screen's key handling and drawing. The release downloads are rebuilt after the last round of code changes.
+
+### 2026-11-08: stack overflow on CPUs with larger signal frames; release 1.0.1
+CI failed once on `stack_overflow` (`tests/terminal.rs`): the program died of SIGSEGV instead of SIGABRT, on the same image
+and toolchain as the run before. Rust's overflow handler aborts while it is on the signal stack, and our SIGABRT handler
+then needed a second signal frame there. Two frames do not fit in 8 KB on CPUs that save more registers (AVX-512, 256 bytes
+more per frame); GitHub's runners are a mix. Reproduced without such a CPU: 512 bytes less signal stack gave the same SIGSEGV
+every time, 384 did not. The message and the restored terminal were not affected, only the way the process ended. Now
+SIGABRT goes back to its default action when a fault is passed on, and `stack_overflow_with_a_small_signal_stack` checks it
+on every CPU. Version 1.0.1 has the seven fuzzing fixes, the low-priority findings and this one.

@@ -340,6 +340,10 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
     let (_ui_on, mut term) = term::start()?;
     #[cfg(debug_assertions)]
     if std::env::var_os("CARDDEMO_TEST_STACK_OVERFLOW").is_some() {
+        #[cfg(unix)]
+        if std::env::var_os("CARDDEMO_TEST_SMALL_SIGNAL_STACK").is_some() {
+            shrink_signal_stack();
+        }
         test_stack_overflow(0); // tests/terminal.rs: a crash while the UI is on
     }
     let mut sess = Session::default();
@@ -389,6 +393,16 @@ fn online(home: &Path, seed: Option<PathBuf>, tran: &str, cobol: bool) -> Result
 fn test_stack_overflow(n: u64) -> u64 {
     let frame = std::hint::black_box([n; 512]);
     test_stack_overflow(n + 1) + frame[0]
+}
+
+/// Takes 2 KB off the signal stack, so that a test leaves as little room as a CPU that saves more registers
+/// in each signal frame (debug builds, `CARDDEMO_TEST_SMALL_SIGNAL_STACK`; see tests/terminal.rs).
+#[cfg(all(debug_assertions, unix))]
+fn shrink_signal_stack() {
+    let mut stack: libc::stack_t = unsafe { std::mem::zeroed() };
+    unsafe { libc::sigaltstack(std::ptr::null(), &mut stack) };
+    stack.ss_size -= 2048;
+    unsafe { libc::sigaltstack(&stack, std::ptr::null_mut()) };
 }
 
 fn aid_of(k: &KeyEvent) -> Option<Aid> {

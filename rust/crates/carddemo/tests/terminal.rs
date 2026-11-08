@@ -247,6 +247,22 @@ fn stack_overflow() {
     r.assert_terminal_restored();
 }
 
+/// Rust's handler aborts while it is still on the signal stack, and a second signal frame there does not fit
+/// on CPUs whose frames are larger (AVX-512: the process then died of SIGSEGV instead of SIGABRT).
+#[test]
+fn stack_overflow_with_a_small_signal_stack() {
+    if !cfg!(debug_assertions) {
+        return; // the trigger exists in debug builds only
+    }
+    let mut env = data("overflow-small");
+    env.push(("CARDDEMO_TEST_STACK_OVERFLOW", "1".into()));
+    env.push(("CARDDEMO_TEST_SMALL_SIGNAL_STACK", "1".into()));
+    let r = run(&["online"], &env, false, &[Step::UiOn(1)]);
+    assert_eq!(signal(&r), Some(libc::SIGABRT), "Rust aborts after reporting the overflow");
+    assert!(r.after_ui().contains("has overflowed its stack"), "Rust's message reaches the terminal: {:?}", r.after_ui());
+    r.assert_terminal_restored();
+}
+
 /// The COBOL module directory, if the modules are built and libcob is there.
 fn cobol() -> Option<PathBuf> {
     cobridge::check().ok().map(|_| cobridge::modules_dir())

@@ -331,7 +331,11 @@ mod signals {
         if let Some(i) = SIGNALS.iter().position(|&s| s == sig).filter(|&i| HAVE_PREV.load(Ordering::SeqCst) & (1 << i) != 0) {
             unsafe { libc::sigaction(sig, &(*PREV.0.get())[i], std::ptr::null_mut()) };
             let kernel_fault = FAULTS.contains(&sig) && !info.is_null() && unsafe { (*info).si_code } > 0;
-            if !kernel_fault {
+            if kernel_fault {
+                // the next handler may abort while it is on this same signal stack (Rust's does, after reporting
+                // a stack overflow), where a second signal frame may not fit, and ours has nothing left to do
+                unsafe { libc::signal(libc::SIGABRT, libc::SIG_DFL) };
+            } else {
                 unsafe { libc::raise(sig) };
             }
         }
