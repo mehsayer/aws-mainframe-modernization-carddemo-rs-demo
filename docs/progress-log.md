@@ -298,3 +298,14 @@ Most findings were in the previous rounds' own fixes, so this round removes laye
   add (accepted difference 1 of `online.py`).
 - Online comparison now 399 screens of 57 sessions.
 - `.github/workflows/ci.yml`: Linux, Windows and the COBOL comparisons (GnuCOBOL 3.2 built from source and cached).
+
+### 2026-11-08: low-priority review findings
+Fixed: the exit key in demo.py's hint (Ctrl+Q); package-release.sh takes the modules from `cicsprep.modules_dir()` and no
+longer rewrites the tracked quick-start PDF; the file viewer uses each data set's record length (and a line-end byte
+inside a record, as in EXPORT.DATA, no longer makes it a text file) and shows no extra last line; one list of nightly jobs;
+an explicit `--home carddemo-data` is honoured by the demo menu; terminal tests ignore `CARDDEMO_*`/`COB_*` from the
+developer's shell, except where GnuCOBOL's parts are (`CARDDEMO_LIBCOB`, `CARDDEMO_COBOL_MODULES`); `lookups.rs` no longer
+claims to be generated; rust/README's command list; the quick-start guide no longer says a wrong libcob version is
+detected; `ast.literal_eval` instead of `eval` in run.py.
+Left on purpose (user's decision): the hard-coded transcript folder of usage.py and phase_metrics.py, and more unit tests
+for the online screen's key handling and drawing. The release downloads are rebuilt after the last round of code changes.

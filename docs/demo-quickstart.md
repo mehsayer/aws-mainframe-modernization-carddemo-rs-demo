@@ -101,8 +101,8 @@ The Linux download also contains the original COBOL screen programs, compiled wi
 `gnucobol` or `gnucobol3` package of your distribution, or built from source), menu option **6** runs
 them on the same kind of stand-in for the mainframe's transaction system (CICS) that the Rust version
 uses. Start the program twice, in two terminal windows side by side, and do the same steps with option 1 in
-one and option 6 in the other: the screens are the same. If the runtime is missing or of another version,
-the menu says why option 6 is not available. (Their output and messages go to
+one and option 6 in the other: the screens are the same. If the runtime is missing, the menu says why option 6 is
+not available. The version is not checked in advance, so use 3.2. (Their output and messages go to
 `carddemo-data/cobol-sysout.log`.)
 
 The complete proof, which compiles and runs all original COBOL programs and compares every output file
