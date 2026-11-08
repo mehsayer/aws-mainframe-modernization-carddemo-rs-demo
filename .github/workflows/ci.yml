@@ -1,0 +1,141 @@
+# Every push and pull request: build, lints and tests on Linux and Windows, then the comparisons with the
+# original COBOL programs (batch outputs, online screens, paragraph coverage, differential fuzzing, manual suite).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  GNUCOBOL_VERSION: "3.2"
+
+jobs:
+  linux:
+    name: Linux build, clippy, tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo build --release
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  windows-cross:
+    name: Windows cross build (MinGW, with icon)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rust
+    env:
+      CC_x86_64_pc_windows_gnu: x86_64-w64-mingw32-gcc
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo build --release --target x86_64-pc-windows-gnu
+
+  windows:
+    name: Windows tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      # the sample data and the expected outputs must keep their line endings
+      - run: git config --global core.autocrlf false
+        working-directory: .
+      - uses: actions/checkout@v4
+      # the target the release is built for
+      - run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+          rustup default stable-x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo test --release --workspace
+
+  cobol-comparisons:
+    name: Comparisons with the COBOL original
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libdb-dev libgmp-dev libncurses-dev
+      # Ubuntu's package is GnuCOBOL 3.1; the comparisons are made with 3.2
+      - id: gnucobol
+        uses: actions/cache@v4
+        with:
+          path: ~/gnucobol
+          key: gnucobol-${{ env.GNUCOBOL_VERSION }}-ubuntu-24.04
+      - name: Build GnuCOBOL
+        if: steps.gnucobol.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -fsSL --retry 5 "https://ftp.gnu.org/gnu/gnucobol/gnucobol-$GNUCOBOL_VERSION.tar.xz" | tar xJ
+          cd "gnucobol-$GNUCOBOL_VERSION"
+          ./configure --prefix="$HOME/gnucobol" --with-db
+          make -j"$(nproc)"
+          make install
+      - name: Put GnuCOBOL on the paths
+        run: |
+          echo "$HOME/gnucobol/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$HOME/gnucobol/lib" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cobc --version | head -1
+      - run: cargo build --release
+      - name: Report helpers (unit tests)
+        run: python3 -m unittest rust/difftest/test_online.py
+        working-directory: .
+      - name: Translate the online programs
+        run: python3 cobridge/cicsprep.py
+      - name: Batch comparison
+        run: python3 difftest/run.py
+      - name: Online comparison
+        run: python3 difftest/online.py
+      - name: Paragraph coverage
+        run: python3 difftest/coverage.py
+      - name: Fuzzing, batch
+        run: python3 difftest/fuzz.py batch --seeds 2
+      - name: Fuzzing, online
+        run: python3 difftest/fuzz.py online --seeds 4
+      - name: Manual test suite (scripted steps)
+        run: python3 docs/tests/execute.py
+        working-directory: .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: comparison-reports
+          if-no-files-found: ignore
+          path: |
+            rust/difftest/out-coverage/coverage.md
+            rust/difftest/out-fuzz/
+            rust/difftest/out-online/*.md
+            rust/difftest/out-online/output.txt
+            docs/tests/results.json
