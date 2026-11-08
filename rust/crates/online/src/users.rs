@@ -693,11 +693,13 @@ fn del_user(t: &mut Task, map: &mut Map, st: &mut UpdState, tran: &str, pgm: &st
         return;
     }
     let id = map.get("USRIDIN").to_vec();
-    let Some(u) = read_user(t, map, tran, pgm, st, &id, "Press PF5 key to delete this user ...") else { return };
+    // READ-USER-SEC-FILE, then DELETE-USER-SEC-FILE whatever the READ answered: with no record held, DELETE is
+    // INVREQ and its "Unable to Update User..." replaces the READ's message
+    read_user(t, map, tran, pgm, st, &id, "Press PF5 key to delete this user ...");
     match t.delete(FILE, None) {
         Ok(()) => {
             clear_upd(map, false);
-            st.message = format!("User {} has been deleted ...", text::s(text::until(u.sec_usr_id(), b" ")));
+            st.message = format!("User {} has been deleted ...", text::s(text::until(&id, b" ")));
             map.color("ERRMSG", Color::Green);
             send_upd(t, map, tran, pgm, st);
         }

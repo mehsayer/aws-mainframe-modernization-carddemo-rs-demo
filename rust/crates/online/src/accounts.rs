@@ -324,6 +324,15 @@ const MONEY_FIELDS: &[(&str, &str)] = &[
     ("ACRDLIM", "credit_limit"), ("ACSHLIM", "cash_limit"), ("ACURBAL", "curr_bal"), ("ACRCYCR", "cyc_credit"), ("ACRCYDB", "cyc_debit"),
 ];
 
+/// The fields in the order of POSITION CURSOR's EVALUATE (3300-SETUP-SCREEN-ATTRS), not the screen's order: the
+/// first field in error gets the cursor. Fields not listed have no WHEN: the cursor goes to the account id.
+const CURSOR_ORDER: &[&str] = &[
+    "ACSTTUS", "OPNYEAR", "OPNMON", "OPNDAY", "ACRDLIM", "EXPYEAR", "EXPMON", "EXPDAY", "ACSHLIM", "RISYEAR", "RISMON", "RISDAY",
+    "ACURBAL", "ACRCYCR", "ACRCYDB", "ACTSSN1", "ACTSSN2", "ACTSSN3", "DOBYEAR", "DOBMON", "DOBDAY", "ACSTFCO", "ACSFNAM", "ACSMNAM",
+    "ACSLNAM", "ACSADL1", "ACSSTTE", "ACSZIPC", "ACSCITY", "ACSCTRY", "ACSPH1A", "ACSPH1B", "ACSPH1C", "ACSPH2A", "ACSPH2B", "ACSPH2C",
+    "ACSEFTC", "ACSPFLG",
+];
+
 struct Acu {
     action: u8,
     old: Snap,
@@ -545,7 +554,11 @@ fn edit_date(s: &mut Acu, name: &str, fy: &'static str, fm: &'static str, fd: &'
         parts_ok[0] = false;
     }
     // month
-    let mn: Option<u32> = if is_numeric(&m, false) { text::s(&m).parse().ok() } else { None };
+    // WS-VALID-MONTH reads the characters as PIC 9(2), where a leading space counts as 0 (" 3" is March)
+    let mn: Option<u32> = match m[..] {
+        [a, b] if (a == b' ' || a.is_ascii_digit()) && b.is_ascii_digit() => Some(u32::from(a & 0x0F) * 10 + u32::from(b & 0x0F)),
+        _ => None,
+    };
     if blank(&m) {
         s.err(fm, b'B', format!("{name} : Month must be supplied."));
         parts_ok[1] = false;
@@ -554,7 +567,8 @@ fn edit_date(s: &mut Acu, name: &str, fy: &'static str, fm: &'static str, fd: &'
         parts_ok[1] = false;
     }
     // day
-    let dn: Option<u32> = if text::test_numval(&d) == 0 { Some(cobol::numeric::to_i64(text::numval(&d)) as u32) } else { None };
+    // COMPUTE WS-EDIT-DATE-DD-N = NUMVAL(...): an unsigned PIC 9(2), so the sign is dropped ("-5" is the 5th)
+    let dn: Option<u32> = if text::test_numval(&d) == 0 { Some(cobol::numeric::to_i64(text::numval(&d)).unsigned_abs() as u32 % 100) } else { None };
     if blank(&d) {
         s.err(fd, b'B', format!("{name} : Day must be supplied."));
         parts_ok[2] = false;
@@ -589,7 +603,8 @@ fn edit_date(s: &mut Acu, name: &str, fy: &'static str, fm: &'static str, fd: &'
         return;
     }
     // EDIT-DATE-LE (CSUTLDTC with YYYYMMDD); on failure the flags end up valid again
-    let ymd = [y.clone(), m.clone(), d.clone()].concat();
+    // (the COMPUTEs of EDIT-MONTH and EDIT-DAY have rewritten both parts as two digits by now)
+    let ymd = [y.clone(), format!("{mv:02}").into_bytes(), format!("{dv:02}").into_bytes()].concat();
     let r = csutldtc(&ymd, b"YYYYMMDD");
     if r.severity != 0 {
         s.input_error = true;
@@ -882,7 +897,12 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
         match s.action {
             0 | b' ' => {}
             b'E' | b'N' | b'C' | b'L' | b'F' => show_new(s, map),
-            _ => show_old(s, map),
+            _ => {
+                // 3202-SHOW-ORIGINAL-VALUES clears WS-NON-KEY-FLAGS. The SSN flags are not in that group
+                // (1265-EDIT-US-SSN tests WS-EDIT-US-SSN-FLGS itself), so after PF12 they stay red.
+                s.bad.retain(|f, _| matches!(*f, "ACTSSN1" | "ACTSSN2" | "ACTSSN3"));
+                show_old(s, map);
+            }
         }
     }
     let info = match s.action {
@@ -920,7 +940,7 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
         }
     }
     map.attr("ACSTNUM", AttrByte::ProtFset);
-    let first_bad = all.iter().find(|f| s.bad.contains_key(**f)).copied();
+    let first_bad = CURSOR_ORDER.iter().find(|f| s.bad.contains_key(**f)).copied();
     // POSITION CURSOR: FOUND-ACCOUNT-DATA is an 88 on WS-INFO-MSG that 3250 has already replaced, so only
     // NO-CHANGES-DETECTED (the error message) puts the cursor on the status; WHEN OTHER -> account id
     let cursor = if s.msg == "No change detected with respect to values fetched." {
@@ -938,7 +958,8 @@ fn acu_send(t: &mut Task, s: &mut Acu, c: &CarddemoCommarea, map: &mut Map) {
         map.set_str("ACCTSID", "*");
         map.color("ACCTSID", Color::Red);
     }
-    if s.action == b'E' {
+    // CSSETATY: (FLG-x-NOT-OK OR FLG-x-BLANK) AND CDEMO-PGM-REENTER
+    if reenter(c) {
         for (f, kind) in s.bad.clone() {
             map.color(f, Color::Red);
             if kind == b'B' {
@@ -993,9 +1014,8 @@ fn show_new(s: &Acu, map: &mut Map) {
         let (raw, n) = s.new.money.get(k).cloned().unwrap_or_default();
         match n {
             Some(v) if !s.bad.contains_key(*f) => map.set_str(f, &edit(v, "+ZZZ,ZZZ,ZZZ.99")),
-            // only the cash credit limit redisplays an invalid raw value (3203)
-            _ if *k == "cash_limit" => map.set(f, &raw),
-            _ => map.set_low(f),
+            // 3203-SHOW-UPDATED-VALUES: a field that is not valid shows what was typed (LOW-VALUES when blank)
+            _ => map.set(f, &raw),
         }
     }
 }

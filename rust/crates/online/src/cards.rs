@@ -621,7 +621,8 @@ pub fn pf3_back(t: &mut Task, c: &mut CarddemoCommarea, tran: &str, pgm: &str, m
 
 fn sl_edit(st: &mut Sl, c: &mut CarddemoCommarea, map: &Map) {
     let a = map.get("ACCTSID");
-    st.cc_acct = if a == b"*" || cobol::text::is_spaces(a) || a.first() == Some(&b'*') && a.len() == 1 { vec![0u8; 11] } else { let mut v = vec![b' '; 11]; text::mv(&mut v, a); v };
+    // ACCTSIDI = '*': the literal is padded with spaces for the comparison
+    st.cc_acct = if a.first() == Some(&b'*') && cobol::text::is_spaces(&a[1..]) || cobol::text::is_spaces(a) { vec![0u8; 11] } else { let mut v = vec![b' '; 11]; text::mv(&mut v, a); v };
     let k = map.get("CARDSID");
     st.cc_card = if k.first() == Some(&b'*') && cobol::text::is_spaces(&k[1..]) || cobol::text::is_spaces(k) { vec![0u8; 16] } else { let mut v = vec![b' '; 16]; text::mv(&mut v, k); v };
     let zero = |b: &[u8]| is_numeric(b, false) && b.iter().all(|&x| x == b'0');
@@ -1264,13 +1265,13 @@ fn upd_send(t: &mut Task, s: &mut Upd, c: &CarddemoCommarea, map: &mut Map) {
         "ACCTSID"
     } else if matches!(s.card, Flg::NotOk | Flg::Blank) {
         "CARDSID"
-    } else if matches!(s.name, Flg::NotOk) {
+    } else if matches!(s.name, Flg::NotOk | Flg::Blank) {
         "CRDNAME"
-    } else if matches!(s.sts, Flg::NotOk) {
+    } else if matches!(s.sts, Flg::NotOk | Flg::Blank) {
         "CRDSTCD"
-    } else if matches!(s.mon, Flg::NotOk) {
+    } else if matches!(s.mon, Flg::NotOk | Flg::Blank) {
         "EXPMON"
-    } else if matches!(s.year, Flg::NotOk) {
+    } else if matches!(s.year, Flg::NotOk | Flg::Blank) {
         "EXPYEAR"
     } else {
         "ACCTSID"

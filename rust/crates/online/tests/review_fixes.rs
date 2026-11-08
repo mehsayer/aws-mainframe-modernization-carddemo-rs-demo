@@ -131,3 +131,56 @@ fn busy_store_is_reported_and_nothing_is_written() {
     let t = Term::new(&r);
     assert_eq!(t.map(), "COSGN0A", "works again once the store is free");
 }
+
+/// Found by differential fuzzing: `*` in the account field of card view means "not supplied" (the COBOL
+/// compares the 11-byte field with the padded literal), also when it comes back from the screen unchanged.
+#[test]
+fn card_view_treats_star_in_the_account_field_as_blank() {
+    let r = region();
+    let mut t = Term::signon(&r, "USER0001", "PASSWORD");
+    t.typ("OPTION", "4").enter();
+    t.typ("CARDSID", "*").enter();
+    assert_eq!((t.field("ACCTSID").as_str(), t.msg().as_str()), ("*", "No input received"));
+    t.enter(); // the redisplayed stars come back as input
+    assert_eq!((t.field("ACCTSID").as_str(), t.msg().as_str()), ("*", "No input received"));
+}
+
+/// Found by differential fuzzing: EDIT-MONTH and EDIT-DAY rewrite the date as digits before CEEDAYS sees it,
+/// a month with a leading space is valid, and a day goes through an unsigned item (its sign is dropped).
+#[test]
+fn account_update_dates_are_rewritten_as_digits_before_validation() {
+    let r = region();
+    let mut t = Term::signon(&r, "USER0001", "PASSWORD");
+    t.typ("OPTION", "2").enter();
+    t.typ("ACCTSID", "00000000001").enter();
+    t.typ("OPNMON", " 3").typ("OPNDAY", "-5").enter();
+    assert!(!t.msg().contains("Open Date"), "{}", t.msg());
+    assert_eq!(t.field("OPNMON"), " 3", "the screen keeps what was typed");
+}
+
+/// Found by differential fuzzing: 3202-SHOW-ORIGINAL-VALUES clears WS-NON-KEY-FLAGS, but the SSN flags are
+/// outside that group, so after PF12 only the SSN fields stay red.
+#[test]
+fn account_update_pf12_keeps_only_the_ssn_errors() {
+    let red = |t: &Term, f: &str| format!("{:?}", t.s.screen.fields.iter().find(|x| x.name.as_deref() == Some(f)).unwrap().color);
+    let r = region();
+    let mut t = Term::signon(&r, "USER0001", "PASSWORD");
+    t.typ("OPTION", "2").enter();
+    t.typ("ACCTSID", "00000000001").enter();
+    t.typ("ACTSSN1", "abc").typ("ACSTTUS", "X").enter();
+    assert_eq!((red(&t, "ACTSSN1").as_str(), red(&t, "ACSTTUS").as_str()), ("Red", "Red"));
+    t.key(Aid::Pf(12));
+    assert_eq!((red(&t, "ACTSSN1").as_str(), red(&t, "ACSTTUS").as_str()), ("Red", "Default"));
+}
+
+/// Found by differential fuzzing: the cursor goes to a field left blank as well as to one that is not valid.
+#[test]
+fn card_update_cursor_goes_to_the_blank_field() {
+    let r = region();
+    let mut t = Term::signon(&r, "USER0001", "PASSWORD");
+    t.typ("OPTION", "3").enter();
+    t.typ("CRDSEL1", "U").enter();
+    assert_eq!(t.map(), "CCRDUPA");
+    t.typ("CRDSTCD", " ").enter();
+    assert_eq!(t.s.screen.cursor, (13, 26));
+}
