@@ -12,7 +12,7 @@ use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
 /// The nightly batch of the CardDemo README.
-const NIGHTLY: [&str; 6] = ["TRANBKP", "POSTTRAN", "INTCALC", "TRANBKP", "COMBTRAN", "CREASTMT"];
+pub const NIGHTLY: [&str; 6] = ["TRANBKP", "POSTTRAN", "INTCALC", "TRANBKP", "COMBTRAN", "CREASTMT"];
 
 pub fn run(home: &Path, seed: Option<PathBuf>) -> Result<()> {
     let Some(seed) = seed else {
@@ -185,18 +185,42 @@ fn open_in_browser(p: &Path) {
     }
 }
 
-/// The lines of an output file: text lines, or fixed-length records (the record length of the data set)
-/// when the file has no line ends. Bytes that are not text (packed decimal, binary zeros) show as '.'.
+/// Data sets of fixed-length records that are not transaction records (LRECL in their JCL). These are looked
+/// up by name first: packed decimal can contain the byte of a line end. ACCTDATA.VBPS is variable-length, two
+/// records for each account: one line per account.
+const RECORD_LENGTHS: [(&str, usize); 11] = [
+    ("DALYREJS", 430),
+    ("ACCTDATA.PSCOMP", 107),
+    ("ACCTDATA.ARRYPS", 110),
+    ("ACCTDATA.VBPS", 55),
+    ("EXPORT.DATA", 500),
+    ("CUSTDATA.IMPORT", 500),
+    ("ACCTDATA.IMPORT", 300),
+    ("CARDXREF.IMPORT", 50),
+    ("CARDDATA.IMPORT", 150),
+    ("TRANSACT.IMPORT", 350),
+    ("IMPORT.ERRORS", 132),
+];
+
+/// The lines of an output file: fixed-length records, or text lines. A file with no line ends that is not
+/// in [`RECORD_LENGTHS`] holds transaction records. Bytes that are not text (packed decimal, binary zeros)
+/// show as '.'.
 fn lines_of(p: &Path) -> Result<Vec<String>> {
     let bytes = std::fs::read(p).with_context(|| format!("reading {}", p.display()))?;
-    let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+    Ok(file_lines(&p.file_name().unwrap_or_default().to_string_lossy(), &bytes))
+}
+
+fn file_lines(name: &str, bytes: &[u8]) -> Vec<String> {
     let show = |b: &[u8]| -> String { b.iter().map(|&c| if (0x20..0x7f).contains(&c) { c as char } else { '.' }).collect() };
-    Ok(if bytes.contains(&b'\n') {
-        bytes.split(|&c| c == b'\n').map(|l| show(l.strip_suffix(b"\r").unwrap_or(l))).collect()
-    } else {
-        let reclen = if name.contains("DALYREJS") { 430 } else { 350 };
-        bytes.chunks(reclen).map(show).collect()
-    })
+    let reclen = RECORD_LENGTHS.iter().find(|(n, _)| name.contains(n)).map(|&(_, len)| len);
+    match reclen {
+        None if bytes.contains(&b'\n') => {
+            // the line end of the last line does not start another one
+            let text = bytes.strip_suffix(b"\n").unwrap_or(bytes);
+            text.split(|&c| c == b'\n').map(|l| show(l.strip_suffix(b"\r").unwrap_or(l))).collect()
+        }
+        _ => bytes.chunks(reclen.unwrap_or(350)).map(show).collect(),
+    }
 }
 
 /// A full-screen viewer: arrows, PgUp/PgDn, Home/End; Left/Right for wide records; q or Esc to go back.
@@ -262,4 +286,28 @@ fn ask(prompt: &str) -> Result<Option<String>> {
 
 fn pause() {
     let _ = ask("\n  Press Enter to continue ...");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_lines;
+
+    #[test]
+    fn the_last_line_end_does_not_add_a_line() {
+        assert_eq!(file_lines("AWS.M2.CARDDEMO.TRANREPT.G0001V00", b"one\r\ntwo\n"), ["one", "two"]);
+    }
+
+    #[test]
+    fn records_are_cut_at_the_length_of_their_data_set() {
+        assert_eq!(file_lines("AWS.M2.CARDDEMO.ACCTDATA.PSCOMP", &[b'a'; 214]).iter().map(String::len).collect::<Vec<_>>(), [107, 107]);
+        assert_eq!(file_lines("AWS.M2.CARDDEMO.DALYREJS.G0001V00", &[b'a'; 430]).len(), 1);
+        assert_eq!(file_lines("AWS.M2.CARDDEMO.SYSTRAN.G0001V00", &[b'a'; 700]).len(), 2);
+    }
+
+    #[test]
+    fn a_line_end_byte_inside_a_record_is_not_a_line_end() {
+        let mut export = vec![b'a'; 1000];
+        export[3] = b'\n';
+        assert_eq!(file_lines("AWS.M2.CARDDEMO.EXPORT.DATA", &export).len(), 2);
+    }
 }

@@ -19,9 +19,9 @@ const DEFAULT_HOME: &str = "carddemo-data";
 #[derive(Parser)]
 #[command(name = "carddemo", version, about = "AWS CardDemo, translated from COBOL/CICS/VSAM to Rust")]
 struct Cli {
-    /// Data directory (SQLite store and sequential data sets)
-    #[arg(long, env = "CARDDEMO_HOME", default_value = DEFAULT_HOME)]
-    home: PathBuf,
+    /// Data directory (SQLite store and sequential data sets) [default: carddemo-data, for the demo menu next to the program]
+    #[arg(long, env = "CARDDEMO_HOME")]
+    home: Option<PathBuf>,
     /// Directory with the shipped EBCDIC sample data (cobol/app/data/EBCDIC)
     #[arg(long, env = "CARDDEMO_SEED")]
     seed: Option<PathBuf>,
@@ -56,7 +56,7 @@ enum Cmd {
     },
     /// Run a sequence of jobs (default: the full nightly batch of the README)
     Batch {
-        #[arg(default_values_t = ["TRANBKP", "POSTTRAN", "INTCALC", "TRANBKP", "COMBTRAN", "CREASTMT"].map(String::from))]
+        #[arg(default_values_t = demo::NIGHTLY.map(String::from))]
         jobs: Vec<String>,
     },
     /// Start the online system (3270-style terminal)
@@ -117,15 +117,16 @@ fn main() -> Result<()> {
     let Some(cmd) = cli.cmd else {
         return demo_menu(cli.home, cli.seed);
     };
+    let home = cli.home.clone().unwrap_or_else(|| DEFAULT_HOME.into());
     match cmd {
         Cmd::Demo => demo_menu(cli.home, cli.seed)?,
         Cmd::Reset => {
             let seed = find_seed(cli.seed)?;
-            let v = open_store(&cli.home)?;
+            let v = open_store(&home)?;
             for (ds, n) in batch::repro::reset(&v, &seed).map_err(anyhow::Error::msg)? {
                 println!("{ds:<10} {n:>5} records");
             }
-            println!("Data store {} reset from {}", cli.home.display(), seed.display());
+            println!("Data store {} reset from {}", home.display(), seed.display());
         }
         Cmd::Jobs => {
             for (j, d) in JOBS {
@@ -134,8 +135,8 @@ fn main() -> Result<()> {
         }
         Cmd::Job { name, parm, start, end, dalytran } => {
             let seed = find_seed(cli.seed)?;
-            let v = open_store(&cli.home)?;
-            let env = Env { vsam: &v, root: cli.home.clone(), seed, echo: true };
+            let v = open_store(&home)?;
+            let env = Env { vsam: &v, root: home.clone(), seed, echo: true };
             let mut o = JobOpts { dalytran, ..JobOpts::default() };
             if let Some(p) = parm {
                 o.intcalc_parm = p;
@@ -150,8 +151,8 @@ fn main() -> Result<()> {
         }
         Cmd::Batch { jobs } => {
             let seed = find_seed(cli.seed)?;
-            let v = open_store(&cli.home)?;
-            let env = Env { vsam: &v, root: cli.home.clone(), seed, echo: false };
+            let v = open_store(&home)?;
+            let env = Env { vsam: &v, root: home.clone(), seed, echo: false };
             for j in jobs {
                 let rc = report_job(&j, run_job(&env, &j.to_uppercase(), &JobOpts::default()));
                 if rc > 4 {
@@ -160,7 +161,7 @@ fn main() -> Result<()> {
             }
         }
         Cmd::Unload { dir } => {
-            let v = open_store(&cli.home)?;
+            let v = open_store(&home)?;
             std::fs::create_dir_all(&dir)?;
             for ds in vsam::CATALOG {
                 let n = batch::repro::repro_out(&v, ds.name, &dir.join(format!("{}.dat", ds.name)), batch::seqfile::Format::Fixed)
@@ -170,10 +171,10 @@ fn main() -> Result<()> {
         }
         Cmd::Online { tran, cobol } => {
             let seed = find_seed(cli.seed.clone()).ok();
-            online(&cli.home, seed, &tran, cobol)?;
+            online(&home, seed, &tran, cobol)?;
         }
         Cmd::Script { steps } => {
-            let v = open_store(&cli.home)?;
+            let v = open_store(&home)?;
             let region = online::region(v);
             let mut s = Session::default();
             region.run(&mut s, Some("CC00"), Aid::Enter);
@@ -193,11 +194,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Where the demo menu keeps its data: the directory that was asked for, else next to the program.
+fn demo_home(asked: Option<PathBuf>, program_dir: Option<PathBuf>) -> PathBuf {
+    asked.or_else(|| program_dir.map(|d| d.join(DEFAULT_HOME))).unwrap_or_else(|| DEFAULT_HOME.into())
+}
+
 /// The demo menu. Its data lives next to the program unless `--home`/`CARDDEMO_HOME` says otherwise (a
 /// double click starts it in an unknown directory).
-fn demo_menu(home: PathBuf, seed: Option<PathBuf>) -> Result<()> {
-    let home = if home == Path::new(DEFAULT_HOME) { demo::exe_dir().map(|d| d.join(DEFAULT_HOME)).unwrap_or(home) } else { home };
-    let r = demo::run(&home, find_seed(seed).ok());
+fn demo_menu(home: Option<PathBuf>, seed: Option<PathBuf>) -> Result<()> {
+    let r = demo::run(&demo_home(home, demo::exe_dir()), find_seed(seed).ok());
     if let Err(e) = &r {
         // the console window of a double click closes at once: show the error first
         eprintln!("Error: {e:#}");
@@ -525,6 +530,14 @@ fn cobol_region(v: vsam::Vsam, home: &Path) -> Result<cics::Region> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn demo_home_keeps_the_directory_that_was_asked_for() {
+        use std::path::PathBuf;
+        let program = Some(PathBuf::from("/opt/demo"));
+        assert_eq!(crate::demo_home(Some("carddemo-data".into()), program.clone()), PathBuf::from("carddemo-data"));
+        assert_eq!(crate::demo_home(None, program), PathBuf::from("/opt/demo/carddemo-data"));
+    }
+
     use super::*;
 
     fn rendered(sess: &Session, width: u16) -> Vec<String> {

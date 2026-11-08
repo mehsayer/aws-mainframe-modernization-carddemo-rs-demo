@@ -195,7 +195,7 @@ def online(cobol=False):
     subprocess.run([str(h.BIN), "reset"], env=env, check=True, capture_output=True)
     which = "the ORIGINAL COBOL programs" if cobol else "the Rust translation"
     print(f"Online screens running {which}.")
-    print("Sign on with  USER0001 / PASSWORD  (or ADMIN001 / PASSWORD).  F3 = back, Esc = clear, F3 on the sign-on screen = exit.")
+    print("Sign on with  USER0001 / PASSWORD  (or ADMIN001 / PASSWORD).  F3 = back, Esc = clear, Ctrl+Q = exit.")
     time.sleep(2)
     os.execve(str(h.BIN), [str(h.BIN), "online"] + (["--cobol"] if cobol else []), env)
 

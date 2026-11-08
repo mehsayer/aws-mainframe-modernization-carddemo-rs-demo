@@ -88,8 +88,10 @@ fn run_program(prog: &Path, cwd: &Path, args: &[&str], env: &[(&str, String)], s
     let argv_c: Vec<CString> = std::iter::once(prog.clone()).chain(args.iter().map(|a| CString::new(*a).unwrap())).collect();
     let mut argv: Vec<*const libc::c_char> = argv_c.iter().map(|c| c.as_ptr()).collect();
     argv.push(std::ptr::null());
+    // nothing from the developer's shell may change what is tested; only where GnuCOBOL's parts are stays
+    let settles_behaviour = |k: &str| (k.starts_with("CARDDEMO_") || k.starts_with("COB_")) && !matches!(k, "CARDDEMO_LIBCOB" | "CARDDEMO_COBOL_MODULES");
     let envp_c: Vec<CString> = std::env::vars()
-        .filter(|(k, _)| !env.iter().any(|(e, _)| e == k))
+        .filter(|(k, _)| !settles_behaviour(k) && !env.iter().any(|(e, _)| e == k))
         .map(|(k, v)| format!("{k}={v}"))
         .chain(env.iter().map(|(k, v)| format!("{k}={v}")))
         .map(|s| CString::new(s).unwrap())
