@@ -9,7 +9,7 @@ on the same input snapshot, and its outputs are compared with the Rust outputs.
 
 Requires GnuCOBOL 3.x (cobc) with an indexed-file handler, and `cargo build --release`.
 """
-import difflib, os, re, shutil, subprocess, sys
+import ast, difflib, os, re, shutil, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -53,7 +53,7 @@ DS = {
 # --------------------------------------------------------------------------- helpers
 
 def a2e_inverse():
-    tbl = eval(open(RS / "crates" / "vsam" / "src" / "a2e.in").read())
+    tbl = ast.literal_eval((RS / "crates" / "vsam" / "src" / "a2e.in").read_text())
     inv = [0] * 256
     for a, e in enumerate(tbl):
         inv[e] = a

@@ -4,8 +4,8 @@ Rust translation of the AWS CardDemo mainframe application (`../cobol/`), by Ill
 
 > **Modification notice (Apache License 2.0, section 4b):** this directory is a derived work of AWS CardDemo,
 > © Amazon.com, Inc. or its affiliates. The COBOL programs, copybooks, BMS maps and JCL were translated into
-> Rust; `crates/cobol/src/copybooks.rs` and `crates/online/src/lookups.rs` are generated from the original
-> files, and the BMS map definitions are read from `../cobol/app/bms` at build time. Licensed under the Apache License 2.0 (`../LICENSE`, `../NOTICE`).
+> Rust; `crates/cobol/src/copybooks.rs` is generated from the original copybooks, `crates/online/src/lookups.rs`
+> was transcribed from `CSLKPCDY`, and the BMS map definitions are read from `../cobol/app/bms` at build time. Licensed under the Apache License 2.0 (`../LICENSE`, `../NOTICE`).
 
 The AWS CardDemo mainframe application (COBOL / CICS / VSAM / JCL), translated to Rust.
 
@@ -16,7 +16,7 @@ The AWS CardDemo mainframe application (COBOL / CICS / VSAM / JCL), translated t
 | `cics` | Pseudo-CICS: BMS maps parsed from `cobol/app/bms`, pseudo-conversational tasks, XCTL/RETURN, file control, TD queue. |
 | `online` | The 17 CICS programs (COSGN00C ... COACTUPC), one function per COBOL paragraph. |
 | `batch` | The batch programs (CBTRN02C, CBACT04C, CBTRN03C, CBSTM03A/B, CBEXPORT/CBIMPORT, ...) and the JCL jobs (`jobs.rs`). |
-| `carddemo` | The binary: terminal UI (`online`), `job`, `batch`, `reset`, `script`. |
+| `carddemo` | The binary: demo menu (`demo`, or no command), terminal UI (`online`), `jobs`, `job`, `batch`, `reset`, `unload`, `script`. |
 
 ```sh
 cargo build --release

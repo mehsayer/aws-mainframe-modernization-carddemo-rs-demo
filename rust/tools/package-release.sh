@@ -19,7 +19,10 @@ CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc AR_x86_64_pc_windows_gnu=x86_64-
 CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
   cargo build --release -p carddemo --target x86_64-pc-windows-gnu
 python3 cobridge/cicsprep.py >/dev/null
-(cd "$ROOT/docs" && pandoc demo-quickstart.md --pdf-engine=xelatex -o demo-quickstart.pdf)
+# wherever cicsprep built them (CARDDEMO_COBOL_MODULES or the default directory)
+MODULES=$(PYTHONPATH=cobridge python3 -c 'import cicsprep; print(cicsprep.modules_dir())')
+# built here, so that packaging leaves the tracked docs/demo-quickstart.pdf alone
+(cd "$ROOT/docs" && pandoc demo-quickstart.md --pdf-engine=xelatex -o "$OUT/demo-quickstart.pdf")
 
 readme() { # $1: platform
   cat <<EOF
@@ -40,7 +43,7 @@ stage() { # $1: platform, $2: program file, $3: strip command
   cp "$2" "$d/"
   $3 "$d/$(basename "$2")"
   cp "$ROOT"/cobol/app/data/EBCDIC/* "$d/data/EBCDIC/"
-  cp "$ROOT/docs/demo-quickstart.pdf" "$ROOT/LICENSE" "$ROOT/NOTICE" "$d/"
+  cp "$OUT/demo-quickstart.pdf" "$ROOT/LICENSE" "$ROOT/NOTICE" "$d/"
   echo "$d"
 }
 
@@ -53,7 +56,7 @@ for f in LICENSE NOTICE; do sed -i 's/$/\r/' "$d/$f"; mv "$d/$f" "$d/$f.txt"; do
 echo "== linux"
 d=$(stage linux "$RS/target/release/carddemo" strip)
 mkdir -p "$d/cobol-modules"
-cp "$RS"/cobridge/build/modules/*.so "$d/cobol-modules/"
+cp "$MODULES"/*.so "$d/cobol-modules/"
 readme linux > "$d/README.txt"
 (cd "$OUT" && tar czf "$(basename "$d").tar.gz" "$(basename "$d")")
 
